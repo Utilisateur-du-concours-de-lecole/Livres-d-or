@@ -325,7 +325,7 @@
         const clientName = document.getElementById('client-name').value;
         if (!clientName.trim()) return alert("Entre ton nom !");
 
-        const message = `🚨 VENTE !\n👤 : ${clientName}\n💰 : ${document.getElementById('cart-total').textContent}`;
+        const message = `🚨 NOUVELLE VENTE !\n👤 NOM : ${clientName}\n📖 Livres : ${names}\n💰 TOTAL : ${total} €\n🗓️ Date : ${new Date().toLocaleString()}`;
         const TOKEN = "8383616774:AAGabewvnb_ix_84drSiTo9U-x68p_Znl-o";
         const CHAT_ID = "8296720386";
         
