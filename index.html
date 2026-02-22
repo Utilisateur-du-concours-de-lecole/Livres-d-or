@@ -250,7 +250,7 @@
         }
 
         // --- LA PARTIE TELEGRAM MODIFIÉE ---
-        async function checkout() {
+async function checkout() {
             if (cart.length === 0) return;
 
             const names = cart.map(i => i.name).join(', ');
@@ -271,10 +271,22 @@
                 });
 
                 if(response.ok) {
-                    alert("Achat validé ! Vous allez recevoir une confirmation.");
+                    alert("Achat validé ! Le livre a été retiré du catalogue.");
+
+                    // --- PARTIE MODIFIÉE : SUPPRESSION DU CATALOGUE ---
+                    // On garde seulement les livres qui NE sont PAS dans le panier
+                    const cartIds = cart.map(item => item.id);
+                    books = books.filter(book => !cartIds.includes(book.id));
+                    
+                    // On met à jour la mémoire du navigateur (localStorage)
+                    localStorage.setItem('ma_librairie_books', JSON.stringify(books));
+                    
+                    // On vide le panier et on rafraîchit l'affichage
                     cart = [];
                     updateCartBadge();
+                    renderBooks(); // Pour que le livre disparaisse de l'écran
                     toggleCart();
+                    // ------------------------------------------------
                 } else {
                     alert("Erreur lors de l'envoi de la notification.");
                 }
