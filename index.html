@@ -136,24 +136,26 @@
     </div>
 
     <div id="add-modal" class="modal">
-        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-4 text-gray-800">
-            <h3 class="text-xl font-bold mb-4">Ajouter un livre</h3>
-            <div class="space-y-4">
-                <input type="text" id="new-name" placeholder="Nom du livre" class="w-full border p-2 rounded-lg">
-                <select id="new-category" class="w-full border p-2 rounded-lg">
-                    <option value="Roman">Roman</option>
-                    <option value="Aventure">Aventure</option>
-                    <option value="Histoire">Histoire</option>
-                    <option value="Manga">Manga</option>
-                    <option value="Horreur">Horreur</option>
-                </select>
-                <input type="number" id="new-price" placeholder="Prix (€)" class="w-full border p-2 rounded-lg">
-                <input type="file" id="new-image" accept="image/*" class="w-full text-sm">
-                <button onclick="addNewBook()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold mt-4 hover:bg-green-700">Publier</button>
-                <button onclick="closeModal('add-modal')" class="w-full text-gray-400 text-sm">Fermer</button>
-            </div>
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-4 text-gray-800">
+        <h3 class="text-xl font-bold mb-4">Ajouter un livre</h3>
+        <div class="space-y-4">
+            <input type="text" id="new-name" placeholder="Nom du livre" class="w-full border p-2 rounded-lg">
+            <select id="new-category" class="w-full border p-2 rounded-lg">
+                <option value="Roman">Roman</option>
+                <option value="Aventure">Aventure</option>
+                <option value="Histoire">Histoire</option>
+                <option value="Manga">Manga</option>
+                <option value="Horreur">Horreur</option>
+            </select>
+            <input type="number" id="new-price" placeholder="Prix (€)" class="w-full border p-2 rounded-lg">
+            <input type="file" id="new-image" accept="image/*" class="w-full text-sm">
+            <!-- Champ PDF ajouté ici -->
+            <input type="file" id="new-pdf" accept="application/pdf" class="w-full text-sm">
+            <button onclick="addNewBook()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold mt-4 hover:bg-green-700">Publier</button>
+            <button onclick="closeModal('add-modal')" class="w-full text-gray-400 text-sm">Fermer</button>
         </div>
     </div>
+</div>
 
     <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-indigo-900 text-white px-8 py-3 rounded-full shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none z-50 text-sm font-semibold">
         Ajouté !
