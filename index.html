@@ -51,7 +51,7 @@
 
     <header class="bg-white border-b sticky top-0 z-40">
         <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-indigo-900">Livres d'Or</h1>
+            <h1 class="text-2xl font-bold text-indigo-900">Librairie De Demain</h1>
             <div class="flex gap-4 items-center">
                 <button onclick="toggleCart()" class="relative p-2 text-gray-700 hover:text-indigo-600 transition">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -162,24 +162,26 @@
     </div>
 
 <script type="module">
-    // 1. IMPORTATION DES MODULES FIREBASE
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+// 1. IMPORTATION DES MODULES FIREBASE (AVEC STORAGE)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
-    // 2. TA CONFIGURATION (TES CLÉS !)
-    const firebaseConfig = {
-        apiKey: "AIzaSyBX9uaBYEevShGWMXK0Owoj216ehlj000E",
-        authDomain: "livres-de-prestiges.firebaseapp.com",
-        projectId: "livres-de-prestiges",
-        storageBucket: "livres-de-prestiges.firebasestorage.app",
-        messagingSenderId: "1053280749548",
-        appId: "1:1053280749548:web:1cb0a0af92b350c05762c9"
-    };
+// 2. TA CONFIGURATION
+const firebaseConfig = {
+    apiKey: "AIzaSyBX9uaBYEevShGWMXK0Owoj216ehlj000E",
+    authDomain: "livres-de-prestiges.firebaseapp.com",
+    projectId: "livres-de-prestiges",
+    storageBucket: "livres-de-prestiges.firebasestorage.app",
+    messagingSenderId: "1053280749548",
+    appId: "1:1053280749548:web:1cb0a0af92b350c05762c9"
+};
 
-    // Initialisation
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const booksCol = collection(db, "books");
+// Initialisation des services
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app); // C'est cette ligne qui permet de gérer les PDF
+const booksCol = collection(db, "books");
 
     const SECRET_CODE = "$0Ul4yM4NE&25137";
     let currentFilter = "Tous";
@@ -227,32 +229,56 @@
         });
     }
 
-    // 4. LOGIQUE D'AJOUT (CLOUD)
-    window.addNewBook = async function() {
-        const name = document.getElementById('new-name').value;
-        const cat = document.getElementById('new-category').value;
-        const price = document.getElementById('new-price').value;
-        const imageFile = document.getElementById('new-image').files[0];
+// 4. LOGIQUE D'AJOUT (CLOUD STORAGE - VERSION PDF)
+window.addNewBook = async function() {
+    const btn = document.querySelector('button[onclick="addNewBook()"]'); // Repère le bouton
+    const name = document.getElementById('new-name').value;
+    const cat = document.getElementById('new-category').value;
+    const price = document.getElementById('new-price').value;
+    const imageFile = document.getElementById('new-image').files[0];
+    const pdfFile = document.getElementById('new-pdf').files[0];
 
-        if(!name || !price || !imageFile) return alert("Remplissez tout !");
+    if(!name || !price || !imageFile || !pdfFile) return alert("Le dossier de l'ouvrage est incomplet !");
+    
+    // On change le texte du bouton pour faire patienter l'utilisateur
+    btn.disabled = true; 
+    btn.textContent = "Signature numérique en cours...";
+
+    try {
+        const timestamp = Date.now();
         
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-            try {
-                await addDoc(booksCol, {
-                    name,
-                    category: cat,
-                    price: price,
-                    image: e.target.result
-                });
-                closeModal('add-modal');
-                showToast("Livre publié sur tous les appareils !");
-            } catch (err) {
-                alert("Erreur : " + err.message);
-            }
-        };
-        reader.readAsDataURL(imageFile);
+        // 1. Envoi de la couverture
+        const imgRef = ref(storage, `covers/${timestamp}_${imageFile.name}`);
+        await uploadBytes(imgRef, imageFile);
+        const imgUrl = await getDownloadURL(imgRef);
+
+        // 2. Envoi du manuscrit (PDF)
+        const pdfRef = ref(storage, `pdfs/${timestamp}_${pdfFile.name}`);
+        await uploadBytes(pdfRef, pdfFile);
+        const pdfUrl = await getDownloadURL(pdfRef);
+
+        // 3. Enregistrement final dans la base de données
+        await addDoc(booksCol, { 
+            name, 
+            category: cat, 
+            price: parseFloat(price).toFixed(2), 
+            image: imgUrl, 
+            pdf: pdfUrl 
+        });
+        
+        closeModal('add-modal');
+        showToast("L'ouvrage a rejoint la collection officielle !");
+        
+        // Nettoyage des champs
+        document.getElementById('new-name').value = '';
+        document.getElementById('new-price').value = '';
+    } catch(e) { 
+        alert("Erreur lors du déploiement : " + e.message); 
+    } finally { 
+        btn.disabled = false; 
+        btn.textContent = "Publier"; 
     }
+};
 
     // 5. FONCTIONS GLOBALES (ADMIN & PANIER)
     window.deleteBook = async function(id) {
