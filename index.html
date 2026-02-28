@@ -106,19 +106,22 @@
         </div>
     </section>
 
-    <div class="bg-white border-b sticky top-[73px] z-30">
-        <div class="max-w-6xl mx-auto px-4 py-4 overflow-x-auto whitespace-nowrap scrollbar-hide text-gray-800">
-            <div class="flex gap-2 justify-center" id="category-filters">
-                <button onclick="filterCategory('Tous')" class="category-pill active px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Tous</button>
-                <button onclick="filterCategory('Roman')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Roman</button>
-                <button onclick="filterCategory('Aventure')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Aventure</button>
-                <button onclick="filterCategory('Histoire')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Histoire</button>
-                <button onclick="filterCategory('Manga')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Manga</button>
-                <button onclick="filterCategory('Horreur')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Horreur</button>
-                <button onclick="filterCategory('Policier')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Policier</button>
-            </div>
+<div class="relative w-full h-44 overflow-hidden flex items-center justify-center shadow-lg border-b border-white/20">
+    <div id="category-bg" class="absolute inset-0 bg-cover bg-center scale-110 blur-md opacity-70 transition-all duration-700"></div>
+    
+    <div class="absolute inset-0 bg-black/30"></div>
+
+    <div class="relative z-10 flex items-center justify-between w-full px-6 max-w-lg">
+        <button onclick="prevCategory()" class="bg-white/10 hover:bg-white/30 text-white w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center transition-all active:scale-90 shadow-lg border border-white/20">❮</button>
+        
+        <div class="text-center">
+            <h2 id="current-cat-name" class="text-white text-2xl font-black italic tracking-[0.2em] uppercase drop-shadow-md">Tous</h2>
+            <div class="h-1 w-8 bg-indigo-400 mx-auto mt-1 rounded-full shadow-glow"></div>
         </div>
+
+        <button onclick="nextCategory()" class="bg-white/10 hover:bg-white/30 text-white w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center transition-all active:scale-90 shadow-lg border border-white/20">❯</button>
     </div>
+</div>
 
     <main class="max-w-6xl mx-auto px-4 py-12">
         <div id="book-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"></div>
