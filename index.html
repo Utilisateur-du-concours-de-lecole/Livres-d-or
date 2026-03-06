@@ -6,7 +6,7 @@ import {
   signInWithCustomToken, 
   onAuthStateChanged, 
   createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
+  signInWithEmailAndPassword,
   signOut 
 } from 'firebase/auth';
 import { 
@@ -14,10 +14,14 @@ import {
   collection, 
   doc, 
   setDoc, 
+  getDoc, 
+  getDocs, 
   addDoc, 
   updateDoc, 
   deleteDoc, 
-  onSnapshot, 
+  onSnapshot,
+  query,
+  where,
   serverTimestamp 
 } from 'firebase/firestore';
 import { 
@@ -30,9 +34,10 @@ import {
   Plus, 
   Edit, 
   Trash2, 
-  X, 
-  CheckCircle, 
-  LogOut 
+  Eye, 
+  X,
+  CheckCircle,
+  LogOut
 } from 'lucide-react';
 
 // --- CONFIGURATION ---
@@ -47,7 +52,7 @@ const GENRES = ["Tous", "Roman", "Aventure", "Horreur", "Manga", "Histoire", "Po
 // --- APP COMPONENT ---
 export default function App() {
   const [user, setUser] = useState(null);
-  const [view, setView] = useState('home');
+  const [view, setView] = useState('home'); // home, detail, login, signup, library, reader, admin
   const [selectedBook, setSelectedBook] = useState(null);
   const [books, setBooks] = useState([]);
   const [myPurchases, setMyPurchases] = useState([]);
@@ -56,167 +61,498 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
 
+  // Initialisation Auth (Règle 3: Toujours authentifier avant de requêter)
   useEffect(() => {
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
+          // Obligatoire pour éviter l'erreur de permission Firestore
           await signInAnonymously(auth);
         }
-      } catch (err) { console.error(err); }
+      } catch (err) {
+        console.error("Auth init error", err);
+      }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setLoading(false); });
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
     return () => unsubscribe();
   }, []);
 
+  // Fetch Books - Garde ajoutée pour attendre l'utilisateur (Règle 3)
   useEffect(() => {
-    if (!user) return;
+    if (!user) return; 
+
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'books');
-    return onSnapshot(q, (s) => setBooks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const booksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setBooks(booksData);
+    }, (err) => {
+      console.error("Firestore Error:", err);
+    });
+    return () => unsubscribe();
   }, [user]);
 
+  // Fetch Purchases - Garde ajoutée pour attendre l'utilisateur
   useEffect(() => {
-    if (!user || user.isAnonymous) return;
+    if (!user || user.isAnonymous) {
+      setMyPurchases([]);
+      return;
+    }
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'purchases');
-    return onSnapshot(q, (s) => setMyPurchases(s.docs.map(d => d.data().bookId)));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const purchases = snapshot.docs.map(doc => doc.data().bookId);
+      setMyPurchases(purchases);
+    }, (err) => {
+      console.error("Purchases fetch error:", err);
+    });
+    return () => unsubscribe();
   }, [user]);
 
+  // Logique de filtrage
   const filteredBooks = useMemo(() => {
-    return books.filter(b => (selectedGenre === "Tous" || b.genre === selectedGenre) && (b.isPublished || isAdmin));
+    if (selectedGenre === "Tous") return books.filter(b => b.isPublished || isAdmin);
+    return books.filter(b => b.genre === selectedGenre && (b.isPublished || isAdmin));
   }, [books, selectedGenre, isAdmin]);
 
-  const navigateTo = (v, d = null) => { setSelectedBook(d); setView(v); setAuthError(""); window.scrollTo(0, 0); };
+  // Navigation
+  const navigateTo = (newView, data = null) => {
+    setSelectedBook(data);
+    setView(newView);
+    setAuthError("");
+    window.scrollTo(0, 0);
+  };
 
-  const handleAdminAccess = () => isAdmin ? navigateTo('admin') : navigateTo('admin-login');
+  const handleLogin = async (email, password) => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      setView(selectedBook ? 'detail' : 'home');
+    } catch (err) {
+      setAuthError("Identifiants invalides.");
+    }
+  };
+
+  const handleSignup = async (email, password, confirmPassword) => {
+    if (password !== confirmPassword) {
+      setAuthError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      setView(selectedBook ? 'detail' : 'home');
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
+
+  const handlePurchase = async (book) => {
+    if (!user || user.isAnonymous) {
+      navigateTo('login', book);
+      return;
+    }
+    try {
+      const purchaseRef = doc(db, 'artifacts', appId, 'users', user.uid, 'purchases', book.id);
+      await setDoc(purchaseRef, {
+        bookId: book.id,
+        purchaseDate: serverTimestamp(),
+        price: book.price
+      });
+      navigateTo('library');
+    } catch (err) {
+      console.error("Purchase error", err);
+    }
+  };
+
+  const handleAdminAccess = () => {
+    const code = prompt("Entrez le code secret Admin :");
+    if (code === ADMIN_CODE) {
+      setIsAdmin(true);
+      navigateTo('admin');
+    } else if (code !== null) {
+      alert("Accès refusé.");
+    }
+  };
+
+  // --- COMPOSANTS INTERFACE ---
 
   const Header = () => (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between font-sans">
-      <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigateTo('home')}>
-        <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">Digitalibrary</span>
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+      <div 
+        className="flex items-center gap-2 cursor-pointer" 
+        onClick={() => navigateTo('home')}
+      >
+        <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+          Digitalibrary
+        </span>
       </div>
+      
       <div className="flex items-center gap-3">
         {user && !user.isAnonymous && (
-          <button onClick={() => navigateTo('library')} className="p-2 text-gray-600 hover:text-blue-600"><Library size={22} /></button>
+          <button 
+            onClick={() => navigateTo('library')}
+            className="p-2 text-gray-600 hover:text-blue-600 transition-colors"
+            title="Ma Bibliothèque"
+          >
+            <Library size={22} />
+          </button>
         )}
-        <button onClick={handleAdminAccess} className={`p-2 ${isAdmin ? 'text-blue-600' : 'text-gray-400'}`}><Lock size={20} /></button>
+        
+        <button 
+          onClick={handleAdminAccess}
+          className={`p-2 transition-colors ${isAdmin ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+          title="Mode Admin"
+        >
+          <Lock size={20} />
+        </button>
+
         {user && !user.isAnonymous && (
-          <button onClick={() => { signOut(auth); setIsAdmin(false); navigateTo('home'); }} className="p-2 text-red-400"><LogOut size={20} /></button>
+          <button 
+            onClick={() => { signOut(auth); setIsAdmin(false); navigateTo('home'); }}
+            className="p-2 text-red-400 hover:text-red-600"
+            title="Déconnexion"
+          >
+            <LogOut size={20} />
+          </button>
         )}
       </div>
     </header>
   );
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-medium text-slate-500">Chargement...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-medium text-slate-500">Chargement de Digitalibrary...</div>;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
       <Header />
+
       <main className="max-w-4xl mx-auto px-4 py-6">
-
-        {view === 'admin-login' && (
-          <div className="max-w-md mx-auto mt-10 p-10 bg-white rounded-[40px] shadow-2xl border text-center">
-            <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-6"><Lock size={40} /></div>
-            <h2 className="text-2xl font-black mb-6">Accès Restreint</h2>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (e.target.adminSecret.value === ADMIN_CODE) { setIsAdmin(true); navigateTo('admin'); }
-              else { alert("Code secret incorrect !"); e.target.adminSecret.value = ""; }
-            }} className="space-y-4">
-              <input name="adminSecret" type="password" placeholder="Code secret..." className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 ring-orange-500 text-center font-bold text-lg" autoFocus />
-              <button type="submit" className="w-full bg-black text-white py-4 rounded-2xl font-black text-lg uppercase">Vérifier</button>
-              <button type="button" onClick={() => navigateTo('home')} className="block mx-auto text-gray-400 text-xs mt-4">Annuler</button>
-            </form>
-          </div>
-        )}
-
+        
+        {/* VUE ACCUEIL */}
         {view === 'home' && (
-          <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="space-y-8">
             <div className="text-center space-y-2">
-              <h1 className="text-3xl font-extrabold">Votre univers de savoir</h1>
+              <h1 className="text-3xl font-extrabold tracking-tight">Votre univers de savoir</h1>
               <p className="text-slate-500">Explorez notre collection exclusive d'e-books.</p>
             </div>
+
             <div className="flex flex-wrap justify-center gap-2">
-              {GENRES.map(g => (
-                <button key={g} onClick={() => setSelectedGenre(g)} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${selectedGenre === g ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border'}`}>{g}</button>
+              {GENRES.map(genre => (
+                <button
+                  key={genre}
+                  onClick={() => setSelectedGenre(genre)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    selectedGenre === genre 
+                    ? 'bg-blue-600 text-white shadow-md' 
+                    : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300'
+                  }`}
+                >
+                  {genre}
+                </button>
               ))}
             </div>
+
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
               {filteredBooks.map(book => (
-                <div key={book.id} onClick={() => navigateTo('detail', book)} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all cursor-pointer group border border-slate-100">
+                <div 
+                  key={book.id} 
+                  className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all cursor-pointer group border border-slate-100"
+                  onClick={() => navigateTo('detail', book)}
+                >
                   <div className="aspect-[3/4] overflow-hidden bg-slate-200 relative">
-                    <img src={book.coverImage || 'https://via.placeholder.com/300x400'} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="" />
-                    {!book.isPublished && <div className="absolute top-2 right-2 bg-yellow-400 text-[10px] font-bold px-2 py-1 rounded">BROUILLON</div>}
+                    <img 
+                      src={book.coverImage || 'https://via.placeholder.com/300x400?text=No+Cover'} 
+                      alt={book.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    {!book.isPublished && (
+                      <div className="absolute top-2 right-2 bg-yellow-400 text-xs font-bold px-2 py-1 rounded">Brouillon</div>
+                    )}
                   </div>
-                  <div className="p-4">
-                    <p className="text-[10px] uppercase font-bold text-blue-500">{book.genre}</p>
+                  <div className="p-4 space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-blue-500">{book.genre}</p>
                     <h3 className="font-bold text-slate-800 line-clamp-1">{book.title}</h3>
                     <p className="text-sm font-semibold text-slate-600">{book.price > 0 ? `${book.price} €` : 'Gratuit'}</p>
                   </div>
                 </div>
               ))}
+              {filteredBooks.length === 0 && (
+                <div className="col-span-full py-20 text-center text-slate-400">
+                  Aucun livre trouvé dans cette catégorie.
+                </div>
+              )}
             </div>
           </div>
         )}
 
+        {/* VUE DÉTAIL */}
         {view === 'detail' && selectedBook && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <button onClick={() => navigateTo('home')} className="mb-6 flex items-center gap-2 text-slate-500 hover:text-blue-600"><ChevronLeft size={20} /> Retour</button>
-            <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl flex flex-col md:row gap-10">
-              <img src={selectedBook.coverImage} className="w-full md:w-1/3 rounded-xl shadow-2xl" alt="" />
+            <button onClick={() => navigateTo('home')} className="mb-6 flex items-center gap-2 text-slate-500 hover:text-blue-600">
+              <ChevronLeft size={20} /> Retour à la boutique
+            </button>
+            <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl border border-slate-100 flex flex-col md:flex-row gap-10">
+              <div className="w-full md:w-1/3 flex-shrink-0">
+                <img 
+                  src={selectedBook.coverImage} 
+                  className="w-full rounded-xl shadow-2xl shadow-blue-900/10"
+                  alt={selectedBook.title}
+                />
+              </div>
               <div className="flex-grow space-y-6">
-                <h1 className="text-4xl font-black text-slate-900">{selectedBook.title}</h1>
-                <p className="text-3xl font-bold text-slate-800">{selectedBook.price} €</p>
-                <button onClick={() => navigateTo('reader', selectedBook)} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg">Lire maintenant</button>
+                <div>
+                  <span className="text-sm font-bold text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-widest">{selectedBook.genre}</span>
+                  <h1 className="text-4xl font-black mt-4 text-slate-900">{selectedBook.title}</h1>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-3xl font-bold text-slate-800">{selectedBook.price} €</span>
+                  {myPurchases.includes(selectedBook.id) ? (
+                    <div className="flex items-center gap-2 text-green-600 font-bold">
+                      <CheckCircle size={20} /> Déjà acheté
+                    </div>
+                  ) : null}
+                </div>
+                
+                <p className="text-slate-600 leading-relaxed italic border-l-4 border-slate-100 pl-4">
+                  Découvrez un chef-d'œuvre numérique. Achetez maintenant et lisez instantanément.
+                </p>
+
+                <div className="pt-6 space-y-4">
+                  {myPurchases.includes(selectedBook.id) ? (
+                    <button 
+                      onClick={() => navigateTo('reader', selectedBook)}
+                      className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+                    >
+                      <BookOpen size={24} /> Lire maintenant
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handlePurchase(selectedBook)}
+                      className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-black shadow-lg flex items-center justify-center gap-2"
+                    >
+                      <ShoppingBag size={24} /> Acheter l'E-Book
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {view === 'admin' && isAdmin && (
-          <AdminPanel books={books} onClose={() => navigateTo('home')} appId={appId} />
+        {/* VUE CONNEXION OBLIGATOIRE */}
+        {view === 'login' && (
+          <div className="max-w-md mx-auto py-10 space-y-8 animate-in zoom-in-95">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold">Connexion</h2>
+              <p className="text-slate-500 mt-2">To buy the book, you must log in or create an account.</p>
+            </div>
+            <form className="space-y-4" onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin(e.target.email.value, e.target.password.value);
+            }}>
+              <input name="email" type="email" placeholder="Email" required className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none" />
+              <input name="password" type="password" placeholder="Mot de passe" required className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none" />
+              {authError && <p className="text-red-500 text-sm font-medium">{authError}</p>}
+              <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors">Se connecter</button>
+              <button 
+                type="button" 
+                onClick={() => setView('signup')}
+                className="w-full text-blue-600 font-medium py-2"
+              >
+                Create an account
+              </button>
+            </form>
+          </div>
         )}
-        
+
+        {/* VUE INSCRIPTION */}
+        {view === 'signup' && (
+          <div className="max-w-md mx-auto py-10 space-y-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold">Créer un compte</h2>
+              <p className="text-slate-500 mt-2">Rejoignez Digitalibrary pour commencer votre collection.</p>
+            </div>
+            <form className="space-y-4" onSubmit={(e) => {
+              e.preventDefault();
+              handleSignup(e.target.email.value, e.target.password.value, e.target.confirm.value);
+            }}>
+              <input name="email" type="email" placeholder="Email" required className="w-full p-3 rounded-xl border border-slate-200 outline-none" />
+              <input name="password" type="password" placeholder="Mot de passe" required className="w-full p-3 rounded-xl border border-slate-200 outline-none" />
+              <input name="confirm" type="password" placeholder="Confirmer le mot de passe" required className="w-full p-3 rounded-xl border border-slate-200 outline-none" />
+              {authError && <p className="text-red-500 text-sm font-medium">{authError}</p>}
+              <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">Créer mon compte</button>
+              <button 
+                type="button" 
+                onClick={() => setView('login')}
+                className="w-full text-slate-500 font-medium py-2"
+              >
+                Retour à la connexion
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* VUE BIBLIOTHÈQUE */}
+        {view === 'library' && (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-black flex items-center gap-3">
+              <Library className="text-blue-600" /> Ma Bibliothèque
+            </h1>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {books.filter(b => myPurchases.includes(b.id)).map(book => (
+                <div 
+                  key={book.id} 
+                  className="bg-white p-2 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => navigateTo('reader', book)}
+                >
+                  <img src={book.coverImage} className="w-full aspect-[3/4] object-cover rounded-lg mb-2" alt={book.title} />
+                  <h4 className="font-bold text-sm line-clamp-1">{book.title}</h4>
+                  <p className="text-xs text-blue-500 font-bold uppercase">{book.genre}</p>
+                </div>
+              ))}
+              {myPurchases.length === 0 && (
+                <div className="col-span-full py-20 text-center">
+                  <p className="text-slate-400">Vous n'avez pas encore d'e-books.</p>
+                  <button onClick={() => setView('home')} className="mt-4 text-blue-600 font-bold">Aller à la boutique</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* VUE LECTURE */}
+        {view === 'reader' && selectedBook && (
+          <div className="max-w-2xl mx-auto pb-20 animate-in fade-in duration-500">
+            <div className="flex items-center justify-between mb-8 sticky top-20 bg-slate-50 py-4 z-10">
+              <button onClick={() => navigateTo('library')} className="flex items-center gap-1 text-slate-500 hover:text-blue-600">
+                <ChevronLeft size={18} /> Bibliothèque
+              </button>
+              <h2 className="font-bold text-slate-400 text-sm uppercase tracking-widest">{selectedBook.title}</h2>
+              <div className="w-10"></div>
+            </div>
+            <article className="prose prose-slate lg:prose-lg bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-100 min-h-[70vh]">
+              <h1 className="text-center mb-10 text-4xl">{selectedBook.title}</h1>
+              <div className="whitespace-pre-wrap leading-relaxed text-slate-700 font-serif">
+                {selectedBook.contentText || "Aucun contenu disponible pour ce livre."}
+              </div>
+            </article>
+          </div>
+        )}
+
+        {/* VUE ADMIN */}
+        {view === 'admin' && isAdmin && (
+          <AdminPanel 
+            books={books} 
+            onClose={() => navigateTo('home')} 
+            appId={appId}
+          />
+        )}
+
       </main>
+
+      {/* Navigation Mobile Tab Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex justify-around items-center p-3 md:hidden z-50">
+        <button onClick={() => navigateTo('home')} className={`p-2 ${view === 'home' ? 'text-blue-600' : 'text-slate-400'}`}>
+          <ShoppingBag />
+        </button>
+        <button onClick={() => navigateTo('library')} className={`p-2 ${view === 'library' ? 'text-blue-600' : 'text-slate-400'}`}>
+          <Library />
+        </button>
+        <button onClick={() => (!user || user.isAnonymous) ? navigateTo('login') : navigateTo('library')} className="p-2 text-slate-400">
+          <User />
+        </button>
+      </nav>
     </div>
   );
 }
 
+// --- SOUS-COMPOSANT PANNEAU ADMIN ---
 function AdminPanel({ books, onClose, appId }) {
   const [editingBook, setEditingBook] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", price: 0, coverImage: "", genre: "Roman", contentText: "", isPublished: false });
+
+  const initialForm = {
+    title: "",
+    price: 0,
+    coverImage: "",
+    genre: "Roman",
+    contentText: "",
+    isPublished: false
+  };
+
+  const [form, setForm] = useState(initialForm);
 
   const handleSave = async (e) => {
     e.preventDefault();
-    const coll = collection(db, 'artifacts', appId, 'public', 'data', 'books');
-    if (editingBook) {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'books', editingBook.id), { ...form, updatedAt: serverTimestamp() });
-    } else {
-      await addDoc(coll, { ...form, createdAt: serverTimestamp() });
+    try {
+      if (editingBook) {
+        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'books', editingBook.id);
+        await updateDoc(ref, { ...form, updatedAt: serverTimestamp() });
+      } else {
+        const coll = collection(db, 'artifacts', appId, 'public', 'data', 'books');
+        await addDoc(coll, { ...form, createdAt: serverTimestamp() });
+      }
+      setIsModalOpen(false);
+      setEditingBook(null);
+      setForm(initialForm);
+    } catch (err) {
+      console.error("Admin Save Error:", err);
     }
-    setIsModalOpen(false); setEditingBook(null);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Supprimer ce livre définitivement ?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'books', id));
+    }
+  };
+
+  const openEdit = (book) => {
+    setEditingBook(book);
+    setForm({ ...book });
+    setIsModalOpen(true);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-black">Gestion Admin</h1>
-        <button onClick={() => { setForm({ title: "", price: 0, coverImage: "", genre: "Roman", contentText: "", isPublished: false }); setEditingBook(null); setIsModalOpen(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold"><Plus size={20} /> Nouveau</button>
+        <button 
+          onClick={() => { setEditingBook(null); setForm(initialForm); setIsModalOpen(true); }}
+          className="bg-blue-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold shadow-lg shadow-blue-600/20"
+        >
+          <Plus size={20} /> Nouveau Livre
+        </button>
       </div>
-      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-50">
-            <tr><th className="px-6 py-4 text-left">Livre</th><th className="px-6 py-4 text-left">Actions</th></tr>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 border-b border-slate-100">
+            <tr>
+              <th className="px-6 py-4 font-bold text-slate-500">Livre</th>
+              <th className="px-6 py-4 font-bold text-slate-500">Statut</th>
+              <th className="px-6 py-4 font-bold text-slate-500 text-right">Actions</th>
+            </tr>
           </thead>
-          <tbody>
-            {books.map(b => (
-              <tr key={b.id} className="border-t">
-                <td className="px-6 py-4 font-bold">{b.title}</td>
-                <td className="px-6 py-4 flex gap-2">
-                  <button onClick={() => { setEditingBook(b); setForm({...b}); setIsModalOpen(true); }} className="p-2 text-blue-600"><Edit size={18} /></button>
-                  <button onClick={async () => { if(confirm("Supprimer ?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'books', b.id)); }} className="p-2 text-red-600"><Trash2 size={18} /></button>
+          <tbody className="divide-y divide-slate-50">
+            {books.map(book => (
+              <tr key={book.id}>
+                <td className="px-6 py-4 flex items-center gap-4">
+                  <img src={book.coverImage} className="w-10 h-14 object-cover rounded shadow-sm" alt="" />
+                  <div>
+                    <p className="font-bold">{book.title}</p>
+                    <p className="text-xs text-slate-400">{book.genre} • {book.price} €</p>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${book.isPublished ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {book.isPublished ? 'Publié' : 'Brouillon'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-right space-x-2">
+                  <button onClick={() => openEdit(book)} className="p-2 text-slate-400 hover:text-blue-600"><Edit size={18} /></button>
+                  <button onClick={() => handleDelete(book.id)} className="p-2 text-slate-400 hover:text-red-600"><Trash2 size={18} /></button>
                 </td>
               </tr>
             ))}
@@ -225,18 +561,50 @@ function AdminPanel({ books, onClose, appId }) {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-3xl p-8 overflow-y-auto max-h-[90vh]">
-            <div className="flex justify-between mb-6"><h2 className="text-2xl font-bold">Livre</h2><button onClick={() => setIsModalOpen(false)}><X /></button></div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-3xl p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">{editingBook ? 'Modifier' : 'Ajouter'}</h2>
+              <button onClick={() => setIsModalOpen(false)}><X /></button>
+            </div>
             <form onSubmit={handleSave} className="space-y-4">
-              <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Titre" className="w-full p-3 border rounded-xl" required />
-              <input type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} placeholder="Prix" className="w-full p-3 border rounded-xl" required />
-              <textarea rows={6} value={form.contentText} onChange={e => setForm({...form, contentText: e.target.value})} placeholder="Contenu..." className="w-full p-3 border rounded-xl" />
-              <div className="flex items-center gap-2">
-                <input type="checkbox" checked={form.isPublished} onChange={e => setForm({...form, isPublished: e.target.checked})} />
-                <label className="font-bold text-slate-700">Publier</label>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-slate-500">Titre</label>
+                  <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-slate-500">Prix (€)</label>
+                  <input type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-slate-500">Genre</label>
+                  <select value={form.genre} onChange={e => setForm({...form, genre: e.target.value})} className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500">
+                    {GENRES.slice(1).map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-slate-500">URL Image Couverture</label>
+                  <input value={form.coverImage} onChange={e => setForm({...form, coverImage: e.target.value})} placeholder="https://..." className="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">Enregistrer</button>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-slate-500">Contenu du livre (Texte)</label>
+                <textarea 
+                  rows={8} 
+                  value={form.contentText} 
+                  onChange={e => setForm({...form, contentText: e.target.value})} 
+                  className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 font-serif" 
+                  placeholder="Écrivez le contenu ici..."
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="pub" checked={form.isPublished} onChange={e => setForm({...form, isPublished: e.target.checked})} />
+                <label htmlFor="pub" className="text-sm font-bold text-slate-700">Publier immédiatement</label>
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 shadow-xl shadow-blue-600/20">
+                {editingBook ? 'Mettre à jour' : 'Enregistrer et Publier'}
+              </button>
             </form>
           </div>
         </div>
