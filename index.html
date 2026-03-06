@@ -95,7 +95,7 @@
         lucide.createIcons();
     };
 
-    // --- FONCTIONS DE VUE ---
+// --- FONCTIONS DE VUE ---
     window.renderHome = (container) => {
         const filtered = state.books.filter(b => (state.selectedGenre === "Tous" || b.genre === state.selectedGenre));
         container.innerHTML = `
@@ -134,7 +134,7 @@
         const owned = state.books.filter(b => state.myPurchases.includes(b.id));
         container.innerHTML = `<h1 class="text-xl font-bold mb-4">Mes livres</h1>
             <div class="grid grid-cols-2 gap-4">
-                ${owned.map(b => `<div onclick="navigateTo('reader', ${JSON.stringify(b).replace(/"/g, '&quot;')})" class="bg-white p-2 rounded border text-center cursor-pointer"><img src="${b.coverImage}" class="rounded mb-2">${b.title}</div>`).join('')}
+                ${owned.length > 0 ? owned.map(b => `<div onclick="navigateTo('reader', ${JSON.stringify(b).replace(/"/g, '&quot;')})" class="bg-white p-2 rounded border text-center cursor-pointer"><img src="${b.coverImage}" class="rounded mb-2">${b.title}</div>`).join('') : '<p class="col-span-full text-slate-400">Aucun livre acheté.</p>'}
             </div>`;
     };
 
@@ -159,12 +159,16 @@
     };
 
     window.renderLogin = (container) => {
-        container.innerHTML = `<div class="p-6 bg-white rounded border">
-            <h2 class="font-bold mb-4">Connexion</h2>
-            <input id="log-email" placeholder="Email" class="w-full p-2 border mb-2">
-            <input id="log-pass" type="password" placeholder="Pass" class="w-full p-2 border mb-4">
-            <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-2 rounded">Se connecter</button>
-        </div>`;
+        container.innerHTML = `
+            <div class="max-w-md mx-auto p-6 bg-white rounded-2xl border space-y-4">
+                <h2 class="font-bold text-center">Espace Client</h2>
+                <input id="log-email" type="email" placeholder="Email" class="w-full p-2 border rounded">
+                <input id="log-pass" type="password" placeholder="Mot de passe (6 car. min)" class="w-full p-2 border rounded">
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="handleAuthAction('login')" class="bg-blue-600 text-white py-2 rounded font-bold">Connexion</button>
+                    <button onclick="handleAuthAction('signup')" class="bg-slate-100 text-slate-700 py-2 rounded font-bold">S'inscrire</button>
+                </div>
+            </div>`;
     };
 
     // --- ACTIONS ---
@@ -192,10 +196,21 @@
         navigateTo('library');
     };
 
-    window.handleLogin = async () => {
-        const e = document.getElementById('log-email').value;
-        const p = document.getElementById('log-pass').value;
-        try { await signInWithEmailAndPassword(auth, e, p); navigateTo('home'); } catch { alert("Erreur connexion"); }
+    window.handleAuthAction = async (type) => {
+        const email = document.getElementById('log-email').value;
+        const pass = document.getElementById('log-pass').value;
+        if (!email || !pass) return alert("Remplissez les champs");
+        
+        try {
+            if (type === 'signup') {
+                const { createUserWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
+                await createUserWithEmailAndPassword(auth, email, pass);
+                alert("Compte créé !");
+            } else {
+                await signInWithEmailAndPassword(auth, email, pass);
+            }
+            navigateTo('home');
+        } catch (e) { alert("Erreur: " + e.message); }
     };
 
     window.logout = () => { signOut(auth); state.isAdmin = false; navigateTo('home'); };
