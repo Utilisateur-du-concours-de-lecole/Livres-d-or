@@ -271,21 +271,16 @@
             navigateTo('library');
         };
 
-window.setGenre = (g) => {
-function renderAdmin(container) { container.innerHTML = "<h1>Mode Admin Activé</h1>"; }
-function renderLibrary(container) { container.innerHTML = "<h1>Ma Bibliothèque</h1>"; }
-    // --- INITIALISATION ---
+// --- INITIALISATION ---
         onAuthStateChanged(auth, (user) => {
             state.user = user;
             
-            // Masquer le chargement et afficher le contenu
             const loader = document.getElementById('loading-screen');
             const main = document.getElementById('main-content');
             if (loader) loader.classList.add('hidden');
             if (main) main.classList.remove('hidden');
 
             if (user) {
-                // Ecouter les livres dans la collection "books"
                 onSnapshot(collection(db, 'books'), (snap) => {
                     state.books = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                     render();
