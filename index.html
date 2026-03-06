@@ -1,468 +1,373 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  BookOpen, 
-  Lock, 
-  User, 
-  ShoppingBag, 
-  Plus, 
-  Trash2, 
-  Edit, 
-  ChevronLeft, 
-  X,
-  Library,
-  CheckCircle,
-  LogOut,
-  Save,
-  Image as ImageIcon
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>livres de Prestige - Mini Librairie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;600&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        h1, h2 {
+            font-family: 'Playfair Display', serif;
+        }
+        .book-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .book-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .category-pill.active {
+            background-color: #4f46e5;
+            color: white;
+        }
+        #cart-drawer {
+            transition: transform 0.3s ease-in-out;
+            transform: translateX(100%);
+        }
+        #cart-drawer.open {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body>
 
-// --- CONFIGURATION ---
-const ADMIN_CODE = "$0Ul4yM4NE&25137";
-const GENRES = ["All", "Novel", "Adventure", "Horror", "Manga", "History", "Crime"];
-const APP_NAME = "Digitalibrary";
-
-export default function App() {
-  // --- ÉTATS GLOBAUX ---
-  const [view, setView] = useState('home'); 
-  const [user, setUser] = useState(null);
-  const [adminAuth, setAdminAuth] = useState(false);
-  const [activeGenre, setActiveGenre] = useState("All");
-  const [selectedBook, setSelectedBook] = useState(null);
-
-  // --- BASE DE DONNÉES ---
-  const [books, setBooks] = useState([
-    { 
-      id: 1, 
-      title: "L'Héritage des Étoiles", 
-      price: 15.00, 
-      genre: "Novel", 
-      cover: "https://images.unsplash.com/photo-1532012197267-da84d127e765?q=80&w=400", 
-      content: "# Chapitre 1\n\nLe silence régnait sur la station orbitale. L'humanité attendait un signe...", 
-      published: true 
-    }
-  ]);
-  const [purchases, setPurchases] = useState([]);
-
-  // --- AUTHENTIFICATION ---
-  const handleLogin = (e) => {
-    e.preventDefault();
-    setUser({ id: "u_" + Date.now(), email: e.target.email.value });
-    setView(selectedBook ? 'checkout' : 'home');
-  };
-
-  const handleSignup = (e) => {
-    e.preventDefault();
-    if (e.target.password.value !== e.target.confirm.value) return alert("Passwords mismatch");
-    setUser({ id: "u_" + Date.now(), email: e.target.email.value });
-    setView(selectedBook ? 'checkout' : 'home');
-  };
-
-  const isPurchased = (id) => purchases.some(p => p.bookId === id && p.userId === user?.id);
-
-  // --- COMPOSANTS INTERFACE ---
-
-  const Header = () => (
-    <header className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-      <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('home')}>
-        <div className="w-8 h-8 bg-black rounded flex items-center justify-center text-white font-black italic">D</div>
-        <h1 className="text-xl font-black text-gray-900 tracking-tighter">{APP_NAME}</h1>
-      </div>
-      <div className="flex items-center gap-3">
-        {user && (
-          <button onClick={() => setView('library')} className="p-2 text-gray-600 hover:text-blue-600 transition flex items-center gap-1 font-bold text-sm">
-            <Library size={18} /> <span className="hidden sm:inline">Ma Bibliothèque</span>
-          </button>
-        )}
-        <button 
-          onClick={() => adminAuth ? setView('admin') : setView('admin-login')} 
-          className={`px-4 py-2 rounded-full font-bold text-sm flex items-center gap-2 transition ${adminAuth ? 'bg-orange-100 text-orange-700' : 'bg-gray-900 text-white hover:bg-black'}`}
-        >
-          <Lock size={14} /> Admin
-        </button>
-      </div>
+    <header class="bg-white border-b sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-indigo-900">Livres d'Or</h1>
+            <div class="flex gap-4 items-center">
+                <button onclick="toggleCart()" class="relative p-2 text-gray-700 hover:text-indigo-600 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span id="cart-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full hidden">0</span>
+                </button>
+                <button onclick="openAdminAuth()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                    Admin
+                </button>
+            </div>
+        </div>
     </header>
-  );
 
-  const AdminLogin = () => {
-    const [input, setInput] = useState('');
+    <div id="cart-overlay" onclick="toggleCart()" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden opacity-0 transition-opacity duration-300"></div>
     
-    const checkCode = (e) => {
-      e.preventDefault();
-      if (input === ADMIN_CODE) {
-        setAdminAuth(true);
-        setView('admin');
-      } else {
-        alert("Code incorrect");
-      }
-    };
-
-    return (
-      <div className="max-w-md mx-auto mt-20 p-10 bg-white rounded-[40px] shadow-2xl border text-center animate-in zoom-in duration-300">
-        <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Lock size={40} />
-        </div>
-        <h2 className="text-2xl font-black mb-6 tracking-tight">Accès Restreint</h2>
-        <form onSubmit={checkCode} className="space-y-4">
-          <input 
-            type="password" 
-            value={input} 
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Code secret..."
-            className="w-full p-4 bg-gray-50 rounded-2xl border outline-none focus:ring-2 ring-orange-500 transition font-bold text-center"
-          />
-          <button type="submit" className="w-full bg-black text-white py-4 rounded-2xl font-black text-lg hover:bg-gray-800 transition active:scale-95 shadow-xl shadow-gray-200">ENTRER</button>
-          <button type="button" onClick={() => setView('home')} className="block mx-auto text-gray-400 text-[10px] font-black uppercase tracking-widest mt-6 hover:text-black transition">Annuler</button>
-        </form>
-      </div>
-    );
-  };
-
-  const Home = () => {
-    const filtered = activeGenre === "All" ? books : books.filter(b => b.genre === activeGenre);
-    return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="flex flex-wrap justify-center gap-2 mb-10 overflow-x-auto py-2">
-          {GENRES.map(g => (
-            <button key={g} onClick={() => setActiveGenre(g)} className={`px-5 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeGenre === g ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border text-gray-500 hover:border-gray-400'}`}>
-              {g}
+    <div id="cart-drawer" class="fixed right-0 top-0 h-full w-full max-w-sm bg-white z-[60] shadow-2xl flex flex-col text-gray-800">
+        <div class="p-6 border-b flex justify-between items-center bg-indigo-900 text-white">
+            <h2 class="text-xl font-bold">Votre Panier</h2>
+            <button onclick="toggleCart()" class="text-white hover:text-indigo-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
             </button>
-          ))}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          {filtered.filter(b => b.published).map(book => (
-            <div key={book.id} className="group cursor-pointer" onClick={() => { setSelectedBook(book); setView('detail'); }}>
-              <div className="aspect-[3/4] rounded-2xl overflow-hidden shadow-sm border group-hover:shadow-xl transition-all duration-300 relative">
-                <img src={book.cover} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg font-bold text-blue-700 shadow-sm text-sm">
-                  {book.price}€
-                </div>
-              </div>
-              <h3 className="mt-3 font-bold text-gray-900 truncate group-hover:text-blue-600 transition">{book.title}</h3>
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{book.genre}</p>
+        
+        <div id="cart-items" class="flex-1 overflow-y-auto p-6 space-y-4">
+            <p class="text-gray-500 text-center py-10">Votre panier est vide.</p>
+        </div>
+
+        <div class="p-6 border-t bg-gray-50">
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Au nom de :</label>
+                <input type="text" id="client-name" placeholder="Ton nom complet" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
             </div>
-          ))}
+
+            <div class="flex justify-between items-center mb-6">
+                <span class="text-gray-600 font-semibold">Total</span>
+                <span id="cart-total" class="text-2xl font-bold text-indigo-900">0 €</span>
+            </div>
+
+            <button onclick="checkout()" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg active:scale-95 disabled:bg-gray-400 disabled:pointer-events-none" id="btn-checkout" disabled>
+                Valider l'achat
+            </button>
         </div>
-      </div>
-    );
-  };
+    </div>
 
-  const AdminPanel = () => {
-    const [adminView, setAdminView] = useState('menu'); 
-    const [formData, setFormData] = useState({ title: '', price: '', genre: 'Novel', cover: '', content: '', published: true });
-    const [editId, setEditId] = useState(null);
-
-    const handleFileUpload = (e) => {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => setFormData({ ...formData, cover: reader.result });
-      if (file) reader.readAsDataURL(file);
-    };
-
-    const applyStyle = (tag) => {
-      const textarea = document.getElementById('book-editor');
-      if (!textarea) return;
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = formData.content;
-      const selectedText = text.substring(start, end);
-      
-      let replacement = "";
-      if (tag === 'b') replacement = `**${selectedText}**`;
-      if (tag === 'u') replacement = `__${selectedText}__`;
-      if (tag === 'h1') replacement = `\n# ${selectedText}\n`;
-      if (tag === 'h2') replacement = `\n## ${selectedText}\n`;
-
-      const newContent = text.substring(0, start) + replacement + text.substring(end);
-      setFormData({ ...formData, content: newContent });
-    };
-
-    const handleSave = () => {
-      if (!formData.title || !formData.content) return alert("Titre et contenu requis !");
-      if (editId) {
-        setBooks(books.map(b => b.id === editId ? { ...formData, id: editId } : b));
-      } else {
-        setBooks([...books, { ...formData, id: Date.now() }]);
-      }
-      setAdminView('menu');
-      setEditId(null);
-      setFormData({ title: '', price: '', genre: 'Novel', cover: '', content: '', published: true });
-    };
-
-    const deleteBook = (id) => {
-      if(window.confirm("Supprimer définitivement ce livre ?")) {
-        setBooks(books.filter(b => b.id !== id));
-        setAdminView('menu');
-      }
-    };
-
-    if (adminView === 'menu') {
-      return (
-        <div className="max-w-4xl mx-auto p-10 text-center animate-in fade-in duration-500">
-          <h2 className="text-4xl font-black mb-10 tracking-tighter uppercase">Administration Boutique</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <button onClick={() => { setEditId(null); setAdminView('add'); }} className="p-10 bg-emerald-500 text-white rounded-[40px] font-black text-xl hover:scale-105 transition shadow-xl shadow-emerald-100 flex flex-col items-center gap-4">
-              <Plus size={48} strokeWidth={3} /> AJOUTER
-            </button>
-            <button onClick={() => setAdminView('edit-select')} className="p-10 bg-amber-500 text-white rounded-[40px] font-black text-xl hover:scale-105 transition shadow-xl shadow-amber-100 flex flex-col items-center gap-4">
-              <Edit size={48} strokeWidth={3} /> MODIFIER
-            </button>
-            <button onClick={() => setAdminView('delete')} className="p-10 bg-rose-500 text-white rounded-[40px] font-black text-xl hover:scale-105 transition shadow-xl shadow-rose-100 flex flex-col items-center gap-4">
-              <Trash2 size={48} strokeWidth={3} /> SUPPRIMER
-            </button>
-          </div>
-          <button onClick={() => setAdminAuth(false) || setView('home')} className="mt-16 flex items-center gap-2 mx-auto text-gray-400 hover:text-red-500 font-bold uppercase text-[10px] tracking-widest transition">
-            <LogOut size={16} /> Quitter le mode Admin
-          </button>
+    <section class="py-12 bg-indigo-900 text-white">
+        <div class="max-w-6xl mx-auto px-4 text-center">
+            <h2 class="text-4xl md:text-5xl mb-4 text-white">L'art des livres d'or</h2>
+            <p class="text-indigo-200 text-lg max-w-2xl mx-auto">Choisissez votre catégorie et profitez de votre achat de prestige.</p>
         </div>
-      );
+    </section>
+
+    <div class="bg-white border-b sticky top-[73px] z-30">
+        <div class="max-w-6xl mx-auto px-4 py-4 overflow-x-auto whitespace-nowrap scrollbar-hide text-gray-800">
+            <div class="flex gap-2 justify-center" id="category-filters">
+                <button onclick="filterCategory('Tous')" class="category-pill active px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Tous</button>
+                <button onclick="filterCategory('Roman')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Roman</button>
+                <button onclick="filterCategory('Aventure')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Aventure</button>
+                <button onclick="filterCategory('Histoire')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Histoire</button>
+                <button onclick="filterCategory('Manga')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Manga</button>
+                <button onclick="filterCategory('Horreur')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Horreur</button>
+                <button onclick="filterCategory('Policier')" class="category-pill px-6 py-2 rounded-full border text-sm font-medium transition hover:border-indigo-500">Policier</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-6xl mx-auto px-4 py-12">
+        <div id="book-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"></div>
+    </main>
+
+    <div id="auth-modal" class="modal">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-4 text-gray-800">
+            <h3 class="text-xl font-bold mb-4">Accès Restreint</h3>
+            <input type="password" id="admin-code" placeholder="Code secret" class="w-full border p-3 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 outline-none">
+            <div class="flex gap-3">
+                <button onclick="closeModal('auth-modal')" class="flex-1 py-2 text-gray-500">Annuler</button>
+                <button onclick="verifyCode()" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold">Valider</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="add-modal" class="modal">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-4 text-gray-800">
+        <h3 class="text-xl font-bold mb-4">Ajouter un livre</h3>
+        <div class="space-y-4">
+            <input type="text" id="new-name" placeholder="Nom du livre" class="w-full border p-2 rounded-lg">
+            <select id="new-category" class="w-full border p-2 rounded-lg">
+                <option value="Roman">Roman</option>
+                <option value="Aventure">Aventure</option>
+                <option value="Histoire">Histoire</option>
+                <option value="Manga">Manga</option>
+                <option value="Horreur">Horreur</option>
+            </select>
+            <input type="number" id="new-price" placeholder="Prix (€)" class="w-full border p-2 rounded-lg">
+            <input type="file" id="new-image" accept="image/*" class="w-full text-sm">
+            <!-- Champ PDF ajouté ici -->
+            <input type="file" id="new-pdf" accept="application/pdf" class="w-full text-sm">
+            <button onclick="addNewBook()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold mt-4 hover:bg-green-700">Publier</button>
+            <button onclick="closeModal('add-modal')" class="w-full text-gray-400 text-sm">Fermer</button>
+        </div>
+    </div>
+</div>
+
+    <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-indigo-900 text-white px-8 py-3 rounded-full shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none z-50 text-sm font-semibold">
+        Ajouté !
+    </div>
+
+<script type="module">
+    // 1. IMPORTATION DES MODULES FIREBASE
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 2. TA CONFIGURATION (TES CLÉS !)
+    const firebaseConfig = {
+        apiKey: "AIzaSyBX9uaBYEevShGWMXK0Owoj216ehlj000E",
+        authDomain: "livres-de-prestiges.firebaseapp.com",
+        projectId: "livres-de-prestiges",
+        storageBucket: "livres-de-prestiges.firebasestorage.app",
+        messagingSenderId: "1053280749548",
+        appId: "1:1053280749548:web:1cb0a0af92b350c05762c9"
+    };
+
+    // Initialisation
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const booksCol = collection(db, "books");
+
+    const SECRET_CODE = "$0Ul4yM4NE&25137";
+    let currentFilter = "Tous";
+    let cart = [];
+    let books = []; 
+    let isAdminActive = false;
+
+    // 3. LECTURE EN TEMPS RÉEL (SYNCHRONISATION)
+    onSnapshot(booksCol, (snapshot) => {
+        books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderBooks();
+    });
+
+    window.renderBooks = function() {
+        const grid = document.getElementById('book-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        const filtered = currentFilter === "Tous" ? books : books.filter(b => b.category === currentFilter);
+
+        if(filtered.length === 0) {
+            grid.innerHTML = '<div class="col-span-full text-center py-20 text-gray-400">Aucun livre à afficher. Attendez que le libraire en ajoute.</div>';
+            return;
+        }
+
+        filtered.forEach(book => {
+            let adminButtons = isAdminActive ? `
+                <div class="flex gap-2 mt-2">
+                    <button onclick="editBook('${book.id}')" class="flex-1 bg-emerald-500 text-white py-1 rounded text-xs font-bold">Prix</button>
+                    <button onclick="deleteBook('${book.id}')" class="flex-1 bg-red-500 text-white py-1 rounded text-xs font-bold">Suppr.</button>
+                </div>` : '';
+
+            grid.innerHTML += `
+                <div class="book-card bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm">
+                    <div class="h-72 overflow-hidden bg-gray-200 relative">
+                        <span class="absolute top-3 left-3 bg-indigo-600 text-white text-[10px] uppercase font-bold px-2 py-1 rounded shadow-lg z-10">${book.category}</span>
+                        <img src="${book.image}" alt="${book.name}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-lg text-gray-800 mb-1 truncate">${book.name}</h3>
+                        <p class="text-indigo-600 font-bold mb-4 text-xl">${book.price} €</p>
+                        <button onclick="addToCart('${book.id}')" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-bold">Ajouter au panier</button>
+                        ${adminButtons}
+                    </div>
+                </div>`;
+        });
     }
 
-    if (adminView === 'add' || adminView === 'edit-form') {
-      return (
-        <div className="max-w-5xl mx-auto p-6 animate-in slide-in-from-bottom-4">
-          <button onClick={() => setAdminView('menu')} className="mb-6 flex items-center gap-2 text-gray-400 font-black uppercase text-xs tracking-widest hover:text-black transition">
-            <ChevronLeft size={16} /> Retour Menu
-          </button>
-          <div className="bg-white rounded-[40px] shadow-2xl border p-10">
-            <h2 className="text-3xl font-black mb-10 tracking-tight">{editId ? "Édition du manuscrit" : "Publier un nouvel e-book"}</h2>
-            
-            <div className="grid md:grid-cols-2 gap-10">
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-[10px] font-black uppercase mb-2 ml-3 text-gray-400 tracking-widest">Titre du livre</label>
-                  <input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-500 transition outline-none font-bold" placeholder="Titre accrocheur..." />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase mb-2 ml-3 text-gray-400 tracking-widest">Prix (€)</label>
-                    <input type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase mb-2 ml-3 text-gray-400 tracking-widest">Genre</label>
-                    <select value={formData.genre} onChange={e => setFormData({...formData, genre: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none">
-                      {GENRES.filter(g => g !== "All").map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase mb-2 ml-3 text-gray-400 tracking-widest">Couverture (Image)</label>
-                  <div className="relative group cursor-pointer border-2 border-dashed border-gray-200 rounded-3xl p-4 flex flex-col items-center justify-center hover:border-blue-400 transition bg-gray-50">
-                    <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                    {formData.cover ? (
-                      <img src={formData.cover} className="h-40 rounded-xl shadow-lg object-cover" />
-                    ) : (
-                      <div className="flex flex-col items-center text-gray-300">
-                        <ImageIcon size={40} />
-                        <span className="text-xs font-bold mt-2">CLIQUER POUR UPLOADER</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+    // 4. LOGIQUE D'AJOUT (CLOUD)
+    window.addNewBook = async function() {
+        const name = document.getElementById('new-name').value;
+        const cat = document.getElementById('new-category').value;
+        const price = document.getElementById('new-price').value;
+        const imageFile = document.getElementById('new-image').files[0];
 
-              <div className="flex flex-col">
-                <label className="block text-[10px] font-black uppercase mb-2 ml-3 text-gray-400 tracking-widest">Éditeur de contenu</label>
-                <div className="flex bg-gray-900 text-white p-3 rounded-t-3xl gap-3 border-b border-gray-800">
-                  <button onClick={() => applyStyle('h1')} className="px-3 py-1 hover:bg-gray-700 rounded-lg font-black">H1</button>
-                  <button onClick={() => applyStyle('h2')} className="px-3 py-1 hover:bg-gray-700 rounded-lg font-black">H2</button>
-                  <button onClick={() => applyStyle('b')} className="px-3 py-1 hover:bg-gray-700 rounded-lg font-black">GRAS</button>
-                  <button onClick={() => applyStyle('u')} className="px-3 py-1 hover:bg-gray-700 rounded-lg underline font-bold">SOULIGNÉ</button>
-                </div>
-                <textarea 
-                  id="book-editor"
-                  value={formData.content} 
-                  onChange={e => setFormData({...formData, content: e.target.value})} 
-                  className="w-full p-8 bg-gray-50 rounded-b-3xl border-none h-80 font-serif leading-relaxed text-lg outline-none focus:bg-white transition shadow-inner" 
-                  placeholder="Il était une fois..."
-                />
-              </div>
-            </div>
-
-            <button onClick={handleSave} className="w-full mt-10 bg-blue-600 text-white py-6 rounded-[30px] font-black text-xl flex items-center justify-center gap-3 hover:bg-blue-700 shadow-2xl shadow-blue-100 transition active:scale-95">
-              <CheckCircle size={28} /> {editId ? "METTRE À JOUR LE LIVRE" : "PUBLIER L'OUVRAGE"}
-            </button>
-          </div>
-        </div>
-      );
+        if(!name || !price || !imageFile) return alert("Remplissez tout !");
+        
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                await addDoc(booksCol, {
+                    name,
+                    category: cat,
+                    price: price,
+                    image: e.target.result
+                });
+                closeModal('add-modal');
+                showToast("Livre publié sur tous les appareils !");
+            } catch (err) {
+                alert("Erreur : " + err.message);
+            }
+        };
+        reader.readAsDataURL(imageFile);
     }
 
-    return (
-      <div className="max-w-4xl mx-auto p-6 animate-in fade-in duration-500">
-        <button onClick={() => setAdminView('menu')} className="mb-6 flex items-center gap-2 text-gray-400 font-black uppercase text-xs tracking-widest hover:text-black transition">
-          <ChevronLeft size={16} /> Retour
-        </button>
-        <h2 className="text-3xl font-black mb-8 tracking-tighter uppercase">{adminView === 'delete' ? "Supprimer un e-book" : "Choisir un manuscrit à modifier"}</h2>
-        <div className="grid gap-4">
-          {books.map(b => (
-            <div key={b.id} className="bg-white p-5 rounded-3xl border border-gray-100 flex items-center justify-between group hover:border-blue-500 hover:shadow-xl transition-all duration-300">
-              <div className="flex items-center gap-5">
-                <img src={b.cover} className="w-16 h-20 object-cover rounded-xl shadow-md" />
-                <div>
-                  <h4 className="font-black text-gray-900 leading-tight">{b.title}</h4>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{b.genre} • {b.price}€</p>
-                </div>
-              </div>
-              {adminView === 'delete' ? (
-                <button onClick={() => deleteBook(b.id)} className="bg-rose-50 text-rose-600 p-4 rounded-2xl hover:bg-rose-600 hover:text-white transition shadow-sm"><Trash2 size={24}/></button>
-              ) : (
-                <button onClick={() => { setEditId(b.id); setFormData(b); setAdminView('edit-form'); }} className="bg-amber-50 text-amber-600 p-4 rounded-2xl hover:bg-amber-600 hover:text-white transition shadow-sm"><Edit size={24}/></button>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
+    // 5. FONCTIONS GLOBALES (ADMIN & PANIER)
+    window.deleteBook = async function(id) {
+        if(confirm("Supprimer définitivement ?")) await deleteDoc(doc(db, "books", id));
+    }
 
-  const LoginGate = () => (
-    <div className="max-w-md mx-auto mt-20 p-10 bg-white rounded-[40px] shadow-2xl border text-center animate-in zoom-in duration-300">
-      <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
-        <User size={40} />
-      </div>
-      <h2 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">Identification</h2>
-      <p className="text-gray-500 mb-8 italic font-medium">To buy the book, you must log in or create an account.</p>
-      <form onSubmit={handleLogin} className="space-y-4 text-left">
-        <input name="email" type="email" required placeholder="Votre Email" className="w-full p-4 border rounded-2xl bg-gray-50 outline-none focus:ring-2 ring-blue-500/20" />
-        <input name="password" type="password" required placeholder="Mot de passe" className="w-full p-4 border rounded-2xl bg-gray-50 outline-none focus:ring-2 ring-blue-500/20" />
-        <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black text-xl hover:bg-blue-700 shadow-2xl shadow-blue-100 transition active:scale-95">SE CONNECTER</button>
-        <button type="button" onClick={() => setView('signup')} className="w-full text-blue-600 font-black text-xs uppercase tracking-widest mt-6 hover:underline">Create an account</button>
-      </form>
-    </div>
-  );
+    window.editBook = async function(id) {
+        const nPrice = prompt("Nouveau prix :");
+        if(nPrice) await updateDoc(doc(db, "books", id), { price: nPrice });
+    }
 
-  const Signup = () => (
-    <div className="max-w-md mx-auto mt-20 p-10 bg-white rounded-[40px] shadow-2xl border">
-      <h2 className="text-3xl font-black text-gray-900 mb-8 text-center tracking-tight">Nouveau Compte</h2>
-      <form onSubmit={handleSignup} className="space-y-4">
-        <input name="email" type="email" required placeholder="Email" className="w-full p-4 border rounded-2xl bg-gray-50" />
-        <input name="password" type="password" required placeholder="Mot de passe" className="w-full p-4 border rounded-2xl bg-gray-50" />
-        <input name="confirm" type="password" required placeholder="Confirmer" className="w-full p-4 border rounded-2xl bg-gray-50" />
-        <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black text-xl hover:bg-blue-700">CRÉER LE COMPTE</button>
-        <button type="button" onClick={() => setView('login-gate')} className="w-full text-gray-400 font-bold text-xs mt-6 text-center uppercase tracking-widest">Retour</button>
-      </form>
-    </div>
-  );
+    window.addToCart = function(id) {
+        const book = books.find(b => b.id === id);
+        if(book) {
+            cart.push({...book, cartId: Date.now()});
+            updateCartBadge();
+            showToast(`"${book.name}" ajouté !`);
+        }
+    }
 
-  const BookDetail = () => (
-    <div className="max-w-5xl mx-auto p-6 animate-in slide-in-from-bottom-10">
-      <button onClick={() => setView('home')} className="flex items-center gap-2 text-gray-400 mb-8 hover:text-black font-black uppercase text-xs tracking-widest transition">
-        <ChevronLeft size={16} /> Boutique
-      </button>
-      <div className="flex flex-col md:flex-row gap-16 bg-white p-12 rounded-[60px] shadow-sm border border-gray-100">
-        <div className="w-full md:w-96 flex-shrink-0">
-          <img src={selectedBook.cover} alt={selectedBook.title} className="w-full aspect-[2/3] object-cover rounded-[40px] shadow-2xl" />
-        </div>
-        <div className="flex-1 py-4">
-          <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-tighter">{selectedBook.genre}</span>
-          <h2 className="text-5xl font-black mt-6 text-gray-900 leading-[0.85] tracking-tighter">{selectedBook.title}</h2>
-          <p className="text-4xl font-black text-blue-600 mt-6">{selectedBook.price} €</p>
-          <div className="h-2 w-16 bg-blue-600 rounded-full my-12"></div>
-          <p className="text-gray-500 leading-relaxed text-xl font-medium">
-            Acquérez cet ouvrage exclusif et accédez instantanément à son contenu intégral depuis votre bibliothèque Digitalibrary. Lecture illimitée sans téléchargement.
-          </p>
-          <div className="mt-12">
-            {isPurchased(selectedBook.id) ? (
-              <button onClick={() => setView('reader')} className="bg-emerald-600 text-white px-14 py-6 rounded-3xl font-black text-2xl hover:bg-emerald-700 shadow-xl flex items-center gap-4 transition active:scale-95">
-                <BookOpen size={28} /> LIRE MAINTENANT
-              </button>
-            ) : (
-              <button onClick={() => setView(user ? 'checkout' : 'login-gate')} className="bg-blue-600 text-white px-14 py-6 rounded-3xl font-black text-2xl hover:bg-blue-700 shadow-2xl shadow-blue-100 flex items-center gap-4 transition active:scale-95">
-                <ShoppingBag size={28} /> ACHETER
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    window.toggleCart = function() {
+        const drawer = document.getElementById('cart-drawer');
+        const overlay = document.getElementById('cart-overlay');
+        drawer.classList.toggle('open');
+        overlay.classList.toggle('hidden');
+        renderCart();
+    }
 
-  const Reader = () => {
-    if (!isPurchased(selectedBook.id)) return <div className="p-20 text-center font-black">ACCÈS RESTREINT</div>;
-    return (
-      <div className="min-h-screen bg-stone-50">
-        <div className="bg-white/80 backdrop-blur-md border-b px-8 py-4 sticky top-0 flex items-center justify-between z-10">
-          <button onClick={() => setView('library')} className="flex items-center gap-2 text-gray-400 hover:text-black font-black uppercase text-xs tracking-widest transition">
-            <X size={20} /> Fermer
-          </button>
-          <span className="font-serif font-black text-gray-400 italic text-sm">{selectedBook.title}</span>
-          <div className="w-16"></div>
-        </div>
-        <article className="max-w-2xl mx-auto py-24 px-10">
-          <h1 className="text-6xl font-serif font-black mb-16 text-center text-gray-900 tracking-tighter">{selectedBook.title}</h1>
-          <div className="prose prose-stone lg:prose-xl font-serif leading-loose text-gray-800 space-y-10 text-justify whitespace-pre-wrap">
-            {selectedBook.content}
-          </div>
-          <div className="mt-40 pt-10 border-t border-stone-200 text-center text-stone-300 font-serif italic text-sm">
-            © {APP_NAME} - Lecture sécurisée in-app
-          </div>
-        </article>
-      </div>
-    );
-  };
+    window.updateCartBadge = function() {
+        const badge = document.getElementById('cart-count');
+        badge.textContent = cart.length;
+        badge.classList.toggle('hidden', cart.length === 0);
+    }
 
-  const LibraryView = () => {
-    const owned = books.filter(b => isPurchased(b.id));
-    return (
-      <div className="max-w-6xl mx-auto p-6 animate-in fade-in duration-700">
-        <h2 className="text-5xl font-black text-gray-900 tracking-tighter uppercase mb-12">Mes Achats</h2>
-        {owned.length === 0 ? (
-          <div className="bg-white rounded-[60px] p-24 text-center border shadow-sm">
-            <Library size={100} className="mx-auto text-gray-100 mb-8" />
-            <p className="text-2xl text-gray-300 font-black uppercase tracking-widest">Bibliothèque Vide</p>
-            <button onClick={() => setView('home')} className="mt-8 text-blue-600 font-black hover:underline uppercase tracking-tighter text-sm">Explorer la boutique</button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
-            {owned.map(b => (
-              <div key={b.id} className="cursor-pointer group" onClick={() => { setSelectedBook(b); setView('reader'); }}>
-                <div className="aspect-[2/3] rounded-[30px] overflow-hidden shadow-lg group-hover:shadow-2xl transition-all duration-500 relative bg-gray-100">
-                  <img src={b.cover} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" />
-                  <div className="absolute inset-0 bg-blue-600/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
-                    <BookOpen className="text-white scale-150" size={32} />
-                  </div>
-                </div>
-                <h3 className="mt-5 font-black text-sm text-gray-900 leading-tight uppercase tracking-tight truncate">{b.title}</h3>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
+    window.renderCart = function() {
+        const container = document.getElementById('cart-items');
+        const totalEl = document.getElementById('cart-total');
+        const btnCheckout = document.getElementById('btn-checkout');
+        
+        if(cart.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-center py-10">Panier vide.</p>';
+            totalEl.textContent = '0 €';
+            btnCheckout.disabled = true;
+            return;
+        }
+        
+        btnCheckout.disabled = false;
+        let total = 0;
+        container.innerHTML = '';
+        cart.forEach(item => {
+            total += parseFloat(item.price);
+            container.innerHTML += `
+                <div class="flex items-center gap-4 bg-gray-50 p-3 rounded-xl">
+                    <img src="${item.image}" class="w-12 h-16 object-cover rounded">
+                    <div class="flex-1">
+                        <h4 class="font-bold text-xs">${item.name}</h4>
+                        <p class="text-indigo-600 text-xs font-bold">${item.price} €</p>
+                    </div>
+                    <button onclick="removeFromCart(${item.cartId})" class="text-red-400">×</button>
+                </div>`;
+        });
+        totalEl.textContent = `${total} €`;
+    }
 
-  const Checkout = () => (
-    <div className="max-w-md mx-auto mt-20 p-12 bg-white rounded-[60px] shadow-2xl border text-center animate-in zoom-in duration-500">
-      <h2 className="text-4xl font-black text-gray-900 mb-2 tracking-tighter uppercase">Paiement</h2>
-      <p className="text-gray-400 mb-10 font-black text-[10px] uppercase tracking-widest">SÉCURISÉ PAR {APP_NAME.toUpperCase()}</p>
-      <div className="bg-gray-50 p-8 rounded-[40px] mb-10 text-left border border-gray-100">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-gray-400 font-bold text-[10px] uppercase">Livre</span>
-          <span className="text-gray-400 font-bold text-[10px] uppercase">Total</span>
-        </div>
-        <div className="flex justify-between items-center font-black text-blue-900 text-xl">
-          <span className="truncate mr-4">{selectedBook.title}</span>
-          <span className="whitespace-nowrap">{selectedBook.price} €</span>
-        </div>
-      </div>
-      <button onClick={() => { setPurchases([...purchases, { id: Date.now(), bookId: selectedBook.id, userId: user.id }]); setView('library'); }} className="w-full bg-blue-600 text-white py-6 rounded-[30px] font-black text-2xl hover:bg-blue-700 shadow-2xl shadow-blue-100 transition active:scale-95">CONFIRMER</button>
-      <button onClick={() => setView('detail')} className="mt-8 text-gray-300 font-black uppercase text-[10px] tracking-widest hover:text-red-500 transition">Annuler</button>
-    </div>
-  );
+    window.removeFromCart = function(cartId) {
+        cart = cart.filter(i => i.cartId !== cartId);
+        updateCartBadge();
+        renderCart();
+    }
 
-  return (
-    <div className="min-h-screen bg-gray-50/50 text-gray-900 font-sans selection:bg-blue-100">
-      {view !== 'reader' && <Header />}
-      <main className="pb-20">
-        {view === 'home' && <Home />}
-        {view === 'detail' && <BookDetail />}
-        {view === 'login-gate' && <LoginGate />}
-        {view === 'signup' && <Signup />}
-        {view === 'checkout' && <Checkout />}
-        {view === 'library' && <LibraryView />}
-        {view === 'reader' && <Reader />}
-        {view === 'admin' && <AdminPanel />}
-        {view === 'admin-login' && <AdminLogin />}
-      </main>
-    </div>
-  );
-}
+    window.checkout = async function() {
+        const clientName = document.getElementById('client-name').value;
+        if (!clientName.trim()) return alert("Entre ton nom !");
+
+        const message = `🚨 NOUVELLE VENTE !\n👤 NOM : ${clientName}\n📖 Livres : ${names}\n💰 TOTAL : ${total} €\n🗓️ Date : ${new Date().toLocaleString()}`;
+        const TOKEN = "8383616774:AAGabewvnb_ix_84drSiTo9U-x68p_Znl-o";
+        const CHAT_ID = "8296720386";
+        
+        await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: CHAT_ID, text: message })
+        });
+
+        alert("Merci pour votre achat !");
+        cart = [];
+        updateCartBadge();
+        toggleCart();
+    }
+
+    window.filterCategory = (cat) => {
+        currentFilter = cat;
+        document.querySelectorAll('.category-pill').forEach(btn => {
+            btn.classList.toggle('active', btn.textContent === cat);
+        });
+        renderBooks();
+    }
+    
+    window.openAdminAuth = () => document.getElementById('auth-modal').classList.add('active');
+    window.closeModal = (id) => document.getElementById(id).classList.remove('active');
+    window.verifyCode = () => {
+        if(document.getElementById('admin-code').value === SECRET_CODE) {
+            isAdminActive = true;
+            closeModal('auth-modal');
+            document.getElementById('add-modal').classList.add('active');
+            renderBooks();
+        } else { alert("Code faux !"); }
+    }
+    
+    window.showToast = (msg) => {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.remove('opacity-0', 'translate-y-20');
+        setTimeout(() => t.classList.add('opacity-0', 'translate-y-20'), 2500);
+    }
+</script>
+</body>
+</html>
