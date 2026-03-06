@@ -40,197 +40,186 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, addDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // --- CONFIGURATION ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBX9uaBYEevShGWMXK0Owoj216ehlj0O0E",
-            authDomain: "livres-de-prestiges.firebaseapp.com",
-            projectId: "livres-de-prestiges",
-            storageBucket: "livres-de-prestiges.firebasestorage.app",
-            messagingSenderId: "1053280749548",
-            appId: "1:1053280749548:web:1cb0a0af92b350c05762c9"
-        };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = 'digitalibrary-v1';
-        const ADMIN_CODE = "$0Ul4yM4NE&25137";
-        const GENRES = ["Tous", "Roman", "Aventure", "Horreur", "Manga", "Histoire", "Policier"];
+    const firebaseConfig = {
+        apiKey: "AIzaSyBX9uaBYEevShGWMXK0Owoj216ehlj0O0E",
+        authDomain: "livres-de-prestiges.firebaseapp.com",
+        projectId: "livres-de-prestiges",
+        storageBucket: "livres-de-prestiges.firebasestorage.app",
+        messagingSenderId: "1053280749548",
+        appId: "1:1053280749548:web:1cb0a0af92b350c05762c9"
+    };
 
-        let state = {
-            user: null, view: 'home', selectedBook: null,
-            books: [], myPurchases: [], selectedGenre: "Tous",
-            isAdmin: false, authError: ""
-        };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = 'digitalibrary-v1';
+    const ADMIN_CODE = "$0Ul4yM4NE&25137";
+    const GENRES = ["Tous", "Roman", "Aventure", "Horreur", "Manga", "Histoire", "Policier"];
 
-        window.navigateTo = (view, data = null) => {
-            state.view = view;
-            state.selectedBook = data;
-            state.authError = "";
-            window.scrollTo(0, 0);
-            render();
-        };
+    let state = {
+        user: null, view: 'home', selectedBook: null,
+        books: [], myPurchases: [], selectedGenre: "Tous",
+        isAdmin: false
+    };
 
-        const render = () => {
-            const container = document.getElementById('view-container');
-            const headerActions = document.getElementById('header-actions');
-            
-            headerActions.innerHTML = `
-                ${state.user && !state.user.isAnonymous ? `<button onclick="navigateTo('library')" class="p-2 text-gray-600 hover:text-blue-600"><i data-lucide="library"></i></button>` : ''}
-                <button onclick="handleAdminAccess()" class="p-2 ${state.isAdmin ? 'text-blue-600' : 'text-gray-400'}"><i data-lucide="lock"></i></button>
-                ${state.user && !state.user.isAnonymous ? `<button onclick="logout()" class="p-2 text-red-400 hover:text-red-600"><i data-lucide="log-out"></i></button>` : ''}
-            `;
+    // --- NAVIGATION ---
+    window.navigateTo = (view, data = null) => {
+        state.view = view;
+        state.selectedBook = data;
+        render();
+    };
 
-            if (state.view === 'home') renderHome(container);
-            else if (state.view === 'detail') renderDetail(container);
-            else if (state.view === 'login') renderLogin(container);
-            else if (state.view === 'signup') renderSignup(container);
-            else if (state.view === 'library') renderLibrary(container);
-            else if (state.view === 'reader') renderReader(container);
-            else if (state.view === 'admin') renderAdmin(container);
-
-            lucide.createIcons();
-        };
-
-        // --- COMPOSANTS ---
-
-        function renderHome(container) {
-            const filtered = state.books.filter(b => (state.selectedGenre === "Tous" || b.genre === state.selectedGenre) && (b.isPublished || state.isAdmin));
-            container.innerHTML = `
-                <div class="space-y-8">
-                    <div class="text-center space-y-2">
-                        <h1 class="text-3xl font-extrabold tracking-tight">Votre univers de savoir</h1>
-                    </div>
-                    <div class="flex flex-wrap justify-center gap-2">
-                        ${GENRES.map(g => `<button onclick="setGenre('${g}')" class="px-4 py-1.5 rounded-full text-sm font-medium ${state.selectedGenre === g ? 'bg-blue-600 text-white' : 'bg-white border text-slate-600'}">${g}</button>`).join('')}
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
-                        ${filtered.map(book => `
-                            <div class="bg-white rounded-2xl overflow-hidden shadow-sm border cursor-pointer" onclick="navigateTo('detail', ${JSON.stringify(book).replace(/"/g, '&quot;')})">
-                                <img src="${book.coverImage}" class="w-full aspect-[3/4] object-cover">
-                                <div class="p-4"><h3 class="font-bold line-clamp-1">${book.title}</h3><p class="text-sm">${book.price} €</p></div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>`;
-        }
-
-        function renderDetail(container) {
-            const book = state.selectedBook;
-            const isOwned = state.myPurchases.includes(book.id);
-            container.innerHTML = `
-                <button onclick="navigateTo('home')" class="mb-4 text-slate-500 flex items-center gap-1"><i data-lucide="chevron-left"></i> Retour</button>
-                <div class="bg-white p-6 rounded-3xl shadow-xl flex flex-col md:flex-row gap-8">
-                    <img src="${book.coverImage}" class="w-full md:w-1/3 rounded-xl shadow-lg">
-                    <div class="space-y-4">
-                        <h1 class="text-3xl font-bold">${book.title}</h1>
-                        <p class="text-2xl font-bold">${book.price} €</p>
-                        ${isOwned ? 
-                            `<button onclick="navigateTo('reader', ${JSON.stringify(book).replace(/"/g, '&quot;')})" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold italic">Lire maintenant</button>` : 
-                            `<button onclick="handlePurchase()" class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold">Acheter</button>`
-                        }
-                    </div>
-                </div>`;
-        }
-
-        function renderLibrary(container) {
-            const ownedBooks = state.books.filter(b => state.myPurchases.includes(b.id));
-            container.innerHTML = `
-                <h1 class="text-2xl font-bold mb-6">Ma Bibliothèque</h1>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
-                    ${ownedBooks.length > 0 ? ownedBooks.map(book => `
-                        <div class="bg-white rounded-2xl shadow-sm border p-2 cursor-pointer" onclick="navigateTo('reader', ${JSON.stringify(book).replace(/"/g, '&quot;')})">
-                            <img src="${book.coverImage}" class="w-full aspect-[3/4] object-cover rounded-xl">
-                            <p class="font-bold mt-2 text-center text-sm">${book.title}</p>
-                        </div>`).join('') : '<p class="col-span-full text-center py-10 text-slate-500">Aucun livre acheté.</p>'}
-                </div>`;
-        }
-
-        function renderAdmin(container) {
-            container.innerHTML = `
-                <div class="space-y-6">
-                    <h1 class="text-2xl font-bold">Admin</h1>
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                        <input id="admin-title" placeholder="Titre" class="w-full p-2 border rounded">
-                        <input id="admin-price" type="number" placeholder="Prix" class="w-full p-2 border rounded">
-                        <input id="admin-cover" placeholder="URL Image" class="w-full p-2 border rounded">
-                        <textarea id="admin-content" placeholder="Contenu" class="w-full p-2 border rounded h-32"></textarea>
-                        <button onclick="saveBook()" class="w-full bg-blue-600 text-white py-2 rounded-xl">Ajouter</button>
-                    </div>
-                </div>`;
-        }
-
-        function renderReader(container) {
-            container.innerHTML = `<div class="prose bg-white p-8 rounded-3xl shadow-sm">
-                <button onclick="navigateTo('library')" class="mb-4 text-sm text-blue-600 underline">Retour</button>
-                <h1 class="text-2xl font-bold mb-4">${state.selectedBook.title}</h1>
-                <div class="whitespace-pre-wrap">${state.selectedBook.contentText}</div>
-            </div>`;
-        }
-
-        function renderLogin(container) {
-            container.innerHTML = `<div class="max-w-md mx-auto py-10">
-                <form id="login-form" class="space-y-4 bg-white p-6 rounded-2xl shadow-sm border">
-                    <h2 class="text-xl font-bold">Connexion</h2>
-                    <input name="email" type="email" placeholder="Email" required class="w-full p-2 border rounded">
-                    <input name="password" type="password" placeholder="Pass" required class="w-full p-2 border rounded">
-                    <button class="w-full bg-blue-600 text-white py-2 rounded">Entrer</button>
-                </form>
-            </div>`;
-            document.getElementById('login-form').onsubmit = (e) => { e.preventDefault(); login(e.target.email.value, e.target.password.value); };
-        }
-
-        function renderSignup(container) { container.innerHTML = "<div class='p-10 text-center'><button onclick='navigateTo(\"login\")' class='underline'>Retour</button></div>"; }
-
-        // --- ACTIONS ---
-        window.setGenre = (g) => { state.selectedGenre = g; render(); };
-        window.handleAdminAccess = () => { if(prompt("Code ?") === ADMIN_CODE) { state.isAdmin = true; navigateTo('admin'); } };
+    // --- RENDU PRINCIPAL ---
+    window.render = () => {
+        const container = document.getElementById('view-container');
+        const headerActions = document.getElementById('header-actions');
         
-        window.saveBook = async () => {
-            const book = {
-                title: document.getElementById('admin-title').value,
-                price: parseFloat(document.getElementById('admin-price').value),
-                coverImage: document.getElementById('admin-cover').value,
-                contentText: document.getElementById('admin-content').value,
-                genre: "Roman", isPublished: true
-            };
-            await addDoc(collection(db, 'books'), book);
-            alert("Ajouté !");
-            navigateTo('home');
+        headerActions.innerHTML = `
+            ${state.user && !state.user.isAnonymous ? `<button onclick="navigateTo('library')" class="p-2 text-gray-600"><i data-lucide="library"></i></button>` : ''}
+            <button onclick="handleAdminAccess()" class="p-2 ${state.isAdmin ? 'text-blue-600' : 'text-gray-400'}"><i data-lucide="lock"></i></button>
+            ${state.user && !state.user.isAnonymous ? `<button onclick="logout()" class="p-2 text-red-400"><i data-lucide="log-out"></i></button>` : ''}
+        `;
+
+        if (state.view === 'home') renderHome(container);
+        else if (state.view === 'detail') renderDetail(container);
+        else if (state.view === 'admin') renderAdmin(container);
+        else if (state.view === 'library') renderLibrary(container);
+        else if (state.view === 'reader') renderReader(container);
+        else if (state.view === 'login') renderLogin(container);
+
+        lucide.createIcons();
+    };
+
+    // --- FONCTIONS DE VUE ---
+    window.renderHome = (container) => {
+        const filtered = state.books.filter(b => (state.selectedGenre === "Tous" || b.genre === state.selectedGenre));
+        container.innerHTML = `
+            <div class="space-y-6">
+                <div class="flex flex-wrap gap-2 justify-center">
+                    ${GENRES.map(g => `<button onclick="setGenre('${g}')" class="px-4 py-1 rounded-full border ${state.selectedGenre === g ? 'bg-blue-600 text-white' : 'bg-white'}">${g}</button>`).join('')}
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+                    ${filtered.map(book => `
+                        <div onclick="navigateTo('detail', ${JSON.stringify(book).replace(/"/g, '&quot;')})" class="bg-white rounded-xl overflow-hidden shadow-sm border cursor-pointer">
+                            <img src="${book.coverImage}" class="w-full aspect-[3/4] object-cover">
+                            <div class="p-3"><h3 class="font-bold text-sm">${book.title}</h3></div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+    };
+
+    window.renderDetail = (container) => {
+        const book = state.selectedBook;
+        const isOwned = state.myPurchases.includes(book.id);
+        container.innerHTML = `
+            <div class="bg-white p-6 rounded-2xl shadow-lg space-y-4">
+                <img src="${book.coverImage}" class="w-48 mx-auto rounded-lg shadow-md">
+                <h1 class="text-2xl font-bold text-center">${book.title}</h1>
+                <p class="text-center text-xl font-bold">${book.price} €</p>
+                ${isOwned ? 
+                    `<button onclick="navigateTo('reader', ${JSON.stringify(book).replace(/"/g, '&quot;')})" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Lire</button>` :
+                    `<button onclick="handlePurchase()" class="w-full bg-black text-white py-3 rounded-xl font-bold">Acheter</button>`
+                }
+                <button onclick="navigateTo('home')" class="w-full text-slate-500">Retour</button>
+            </div>`;
+    };
+
+    window.renderLibrary = (container) => {
+        const owned = state.books.filter(b => state.myPurchases.includes(b.id));
+        container.innerHTML = `<h1 class="text-xl font-bold mb-4">Mes livres</h1>
+            <div class="grid grid-cols-2 gap-4">
+                ${owned.map(b => `<div onclick="navigateTo('reader', ${JSON.stringify(b).replace(/"/g, '&quot;')})" class="bg-white p-2 rounded border text-center cursor-pointer"><img src="${b.coverImage}" class="rounded mb-2">${b.title}</div>`).join('')}
+            </div>`;
+    };
+
+    window.renderAdmin = (container) => {
+        container.innerHTML = `
+            <div class="bg-white p-6 rounded-xl border space-y-4">
+                <h2 class="font-bold">Ajouter un livre</h2>
+                <input id="admin-title" placeholder="Titre" class="w-full p-2 border">
+                <input id="admin-price" type="number" placeholder="Prix" class="w-full p-2 border">
+                <input id="admin-cover" placeholder="URL Image" class="w-full p-2 border">
+                <textarea id="admin-content" placeholder="Texte du livre" class="w-full p-2 border h-32"></textarea>
+                <button onclick="saveBook()" class="w-full bg-blue-600 text-white py-2 rounded">Enregistrer</button>
+            </div>`;
+    };
+
+    window.renderReader = (container) => {
+        container.innerHTML = `<div class="bg-white p-6 rounded shadow-sm">
+            <button onclick="navigateTo('library')" class="text-blue-600 mb-4 underline">Retour</button>
+            <h1 class="text-2xl font-bold mb-4">${state.selectedBook.title}</h1>
+            <div class="whitespace-pre-wrap">${state.selectedBook.contentText || 'Pas de texte.'}</div>
+        </div>`;
+    };
+
+    window.renderLogin = (container) => {
+        container.innerHTML = `<div class="p-6 bg-white rounded border">
+            <h2 class="font-bold mb-4">Connexion</h2>
+            <input id="log-email" placeholder="Email" class="w-full p-2 border mb-2">
+            <input id="log-pass" type="password" placeholder="Pass" class="w-full p-2 border mb-4">
+            <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-2 rounded">Se connecter</button>
+        </div>`;
+    };
+
+    // --- ACTIONS ---
+    window.setGenre = (g) => { state.selectedGenre = g; render(); };
+    window.handleAdminAccess = () => { if(prompt("Code ?") === ADMIN_CODE) { state.isAdmin = true; navigateTo('admin'); } };
+    
+    window.saveBook = async () => {
+        const book = {
+            title: document.getElementById('admin-title').value,
+            price: parseFloat(document.getElementById('admin-price').value),
+            coverImage: document.getElementById('admin-cover').value,
+            contentText: document.getElementById('admin-content').value,
+            genre: "Roman", isPublished: true
         };
+        await addDoc(collection(db, 'books'), book);
+        alert("Livre ajouté !");
+        navigateTo('home');
+    };
 
-        const login = async (e, p) => { try { await signInWithEmailAndPassword(auth, e, p); navigateTo('home'); } catch { alert("Erreur"); } };
-        const logout = async () => { await signOut(auth); state.isAdmin = false; navigateTo('home'); };
-
-        window.handlePurchase = async () => {
-            if (!state.user || state.user.isAnonymous) return navigateTo('login');
-            await setDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'purchases', state.selectedBook.id), {
-                bookId: state.selectedBook.id, date: serverTimestamp()
-            });
-            navigateTo('library');
-        };
-
-        // --- INIT ---
-        onAuthStateChanged(auth, (user) => {
-            state.user = user;
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('main-content').classList.remove('hidden');
-            if (user) {
-                onSnapshot(collection(db, 'books'), (snap) => {
-                    state.books = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    render();
-                });
-                onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'purchases'), (snap) => {
-                    state.myPurchases = snap.docs.map(d => d.id);
-                    render();
-                });
-            } else { signInAnonymously(auth); }
-            render();
+    window.handlePurchase = async () => {
+        if (!state.user || state.user.isAnonymous) return navigateTo('login');
+        await setDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'purchases', state.selectedBook.id), {
+            bookId: state.selectedBook.id, date: serverTimestamp()
         });
+        navigateTo('library');
+    };
+
+    window.handleLogin = async () => {
+        const e = document.getElementById('log-email').value;
+        const p = document.getElementById('log-pass').value;
+        try { await signInWithEmailAndPassword(auth, e, p); navigateTo('home'); } catch { alert("Erreur connexion"); }
+    };
+
+    window.logout = () => { signOut(auth); state.isAdmin = false; navigateTo('home'); };
+
+    // --- INITIALISATION ---
+    onAuthStateChanged(auth, (user) => {
+        state.user = user;
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('main-content').classList.remove('hidden');
+        
+        if (user) {
+            onSnapshot(collection(db, 'books'), (snap) => {
+                state.books = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                render();
+            });
+            onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'purchases'), (snap) => {
+                state.myPurchases = snap.docs.map(d => d.id);
+                render();
+            });
+        } else {
+            signInAnonymously(auth).catch(err => console.error("Erreur Auth Anonyme:", err));
+        }
+        render();
+    });
     </script>
 </body>
 </html>
