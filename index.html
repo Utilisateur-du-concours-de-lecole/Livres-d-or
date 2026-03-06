@@ -158,16 +158,47 @@
         </div>`;
     };
 
-    window.renderLogin = (container) => {
+window.renderLogin = (container) => {
         container.innerHTML = `
-            <div class="max-w-md mx-auto p-6 bg-white rounded-2xl border space-y-4">
-                <h2 class="font-bold text-center">Espace Client</h2>
-                <input id="log-email" type="email" placeholder="Email" class="w-full p-2 border rounded">
-                <input id="log-pass" type="password" placeholder="Mot de passe (6 car. min)" class="w-full p-2 border rounded">
-                <div class="grid grid-cols-2 gap-2">
-                    <button onclick="handleAuthAction('login')" class="bg-blue-600 text-white py-2 rounded font-bold">Connexion</button>
-                    <button onclick="handleAuthAction('signup')" class="bg-slate-100 text-slate-700 py-2 rounded font-bold">S'inscrire</button>
+            <div class="max-w-md mx-auto p-6 bg-white rounded-2xl shadow-lg border border-slate-100 space-y-6">
+                <div class="text-center">
+                    <h2 class="text-2xl font-bold text-slate-800">Espace Membre</h2>
+                    <p class="text-slate-500 text-sm mt-1">Connectez-vous pour accéder à vos lectures</p>
                 </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                        <input id="log-email" type="email" placeholder="exemple@outlook.com" 
+                            class="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Mot de passe</label>
+                        <input id="log-pass" type="password" placeholder="••••••••" 
+                            class="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <button onclick="handleAuthAction('login')" 
+                        class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-md shadow-blue-200 transition active:scale-95">
+                        Se connecter
+                    </button>
+                    
+                    <div class="relative py-2">
+                        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-100"></div></div>
+                        <div class="relative flex justify-center text-xs uppercase"><span class="bg-white px-2 text-slate-400">Nouveau ici ?</span></div>
+                    </div>
+
+                    <button onclick="handleAuthAction('signup')" 
+                        class="w-full bg-slate-50 text-blue-600 py-3 rounded-xl font-bold border border-blue-100 hover:bg-blue-50 transition active:scale-95">
+                        Créer un compte gratuitement
+                    </button>
+                </div>
+
+                <button onclick="navigateTo('home')" class="w-full text-center text-slate-400 text-sm hover:text-slate-600">
+                    Retourner à la boutique
+                </button>
             </div>`;
     };
 
