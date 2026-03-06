@@ -27,55 +27,46 @@
                     </span>
                 </div>
                 
-                <div class="flex items-center gap-3" id="header-actions">
-                    </div>
+                <div class="flex items-center gap-3" id="header-actions"></div>
             </header>
 
-            <main class="max-w-4xl mx-auto px-4 py-6" id="view-container">
-                </main>
+            <main class="max-w-4xl mx-auto px-4 py-6" id="view-container"></main>
 
             <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex justify-around items-center p-3 md:hidden z-50">
                 <button onclick="navigateTo('home')" class="p-2 text-slate-400 hover:text-blue-600"><i data-lucide="shopping-bag"></i></button>
                 <button onclick="navigateTo('library')" class="p-2 text-slate-400 hover:text-blue-600"><i data-lucide="library"></i></button>
-                <button onclick="handleProfileClick()" class="p-2 text-slate-400 hover:text-blue-600"><i data-lucide="user"></i></button>
+                <button onclick="navigateTo('login')" class="p-2 text-slate-400 hover:text-blue-600"><i data-lucide="user"></i></button>
             </nav>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, addDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // --- CONFIGURATION ---
         const firebaseConfig = {
-  apiKey: "AIzaSyBX9uaBYEevShGWMXK0Owoj216ehlj0O0E",
-  authDomain: "livres-de-prestiges.firebaseapp.com",
-  projectId: "livres-de-prestiges",
-  storageBucket: "livres-de-prestiges.firebasestorage.app",
-  messagingSenderId: "1053280749548",
-  appId: "1:1053280749548:web:1cb0a0af92b350c05762c9"
-};
+            apiKey: "AIzaSyBX9uaBYEevShGWMXK0Owoj216ehlj0O0E",
+            authDomain: "livres-de-prestiges.firebaseapp.com",
+            projectId: "livres-de-prestiges",
+            storageBucket: "livres-de-prestiges.firebasestorage.app",
+            messagingSenderId: "1053280749548",
+            appId: "1:1053280749548:web:1cb0a0af92b350c05762c9"
+        };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'digitalibrary-v1';
+        const appId = 'digitalibrary-v1';
         const ADMIN_CODE = "$0Ul4yM4NE&25137";
         const GENRES = ["Tous", "Roman", "Aventure", "Horreur", "Manga", "Histoire", "Policier"];
 
-        // --- ETAT GLOBAL ---
         let state = {
-            user: null,
-            view: 'home',
-            selectedBook: null,
-            books: [],
-            myPurchases: [],
-            selectedGenre: "Tous",
-            isAdmin: false,
-            authError: ""
+            user: null, view: 'home', selectedBook: null,
+            books: [], myPurchases: [], selectedGenre: "Tous",
+            isAdmin: false, authError: ""
         };
 
-        // --- FONCTIONS DE NAVIGATION ET RENDU ---
         window.navigateTo = (view, data = null) => {
             state.view = view;
             state.selectedBook = data;
@@ -88,18 +79,12 @@
             const container = document.getElementById('view-container');
             const headerActions = document.getElementById('header-actions');
             
-            // Mise à jour Header
             headerActions.innerHTML = `
-                ${state.user && !state.user.isAnonymous ? `
-                    <button onclick="navigateTo('library')" class="p-2 text-gray-600 hover:text-blue-600"><i data-lucide="library"></i></button>
-                ` : ''}
+                ${state.user && !state.user.isAnonymous ? `<button onclick="navigateTo('library')" class="p-2 text-gray-600 hover:text-blue-600"><i data-lucide="library"></i></button>` : ''}
                 <button onclick="handleAdminAccess()" class="p-2 ${state.isAdmin ? 'text-blue-600' : 'text-gray-400'}"><i data-lucide="lock"></i></button>
-                ${state.user && !state.user.isAnonymous ? `
-                    <button onclick="logout()" class="p-2 text-red-400 hover:text-red-600"><i data-lucide="log-out"></i></button>
-                ` : ''}
+                ${state.user && !state.user.isAnonymous ? `<button onclick="logout()" class="p-2 text-red-400 hover:text-red-600"><i data-lucide="log-out"></i></button>` : ''}
             `;
 
-            // Choix de la vue
             if (state.view === 'home') renderHome(container);
             else if (state.view === 'detail') renderDetail(container);
             else if (state.view === 'login') renderLogin(container);
@@ -108,188 +93,142 @@
             else if (state.view === 'reader') renderReader(container);
             else if (state.view === 'admin') renderAdmin(container);
 
-            lucide.createIcons(); // Réinitialise les icônes après injection HTML
+            lucide.createIcons();
         };
 
-        // --- COMPOSANTS DE RENDU ---
+        // --- COMPOSANTS ---
 
         function renderHome(container) {
-            const filtered = state.books.filter(b => 
-                (state.selectedGenre === "Tous" || b.genre === state.selectedGenre) && 
-                (b.isPublished || state.isAdmin)
-            );
-
+            const filtered = state.books.filter(b => (state.selectedGenre === "Tous" || b.genre === state.selectedGenre) && (b.isPublished || state.isAdmin));
             container.innerHTML = `
                 <div class="space-y-8">
                     <div class="text-center space-y-2">
                         <h1 class="text-3xl font-extrabold tracking-tight">Votre univers de savoir</h1>
-                        <p class="text-slate-500">Explorez notre collection exclusive d'e-books.</p>
                     </div>
                     <div class="flex flex-wrap justify-center gap-2">
-                        ${GENRES.map(g => `
-                            <button onclick="setGenre('${g}')" class="px-4 py-1.5 rounded-full text-sm font-medium transition-all ${state.selectedGenre === g ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200'}">
-                                ${g}
-                            </button>
-                        `).join('')}
+                        ${GENRES.map(g => `<button onclick="setGenre('${g}')" class="px-4 py-1.5 rounded-full text-sm font-medium ${state.selectedGenre === g ? 'bg-blue-600 text-white' : 'bg-white border text-slate-600'}">${g}</button>`).join('')}
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
-                        ${filtered.length ? filtered.map(book => `
-                            <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all cursor-pointer group border border-slate-100" onclick="navigateTo('detail', ${JSON.stringify(book).replace(/"/g, '&quot;')})">
-                                <div class="aspect-[3/4] overflow-hidden bg-slate-200 relative">
-                                    <img src="${book.coverImage || 'https://via.placeholder.com/300x400'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-                                    ${!book.isPublished ? `<div class="absolute top-2 right-2 bg-yellow-400 text-[10px] font-bold px-2 py-1 rounded">BROUILLON</div>` : ''}
-                                </div>
-                                <div class="p-4 space-y-1">
-                                    <p class="text-[10px] uppercase font-bold text-blue-500">${book.genre}</p>
-                                    <h3 class="font-bold text-slate-800 line-clamp-1">${book.title}</h3>
-                                    <p class="text-sm font-semibold text-slate-600">${book.price > 0 ? book.price + ' €' : 'Gratuit'}</p>
-                                </div>
+                        ${filtered.map(book => `
+                            <div class="bg-white rounded-2xl overflow-hidden shadow-sm border cursor-pointer" onclick="navigateTo('detail', ${JSON.stringify(book).replace(/"/g, '&quot;')})">
+                                <img src="${book.coverImage}" class="w-full aspect-[3/4] object-cover">
+                                <div class="p-4"><h3 class="font-bold line-clamp-1">${book.title}</h3><p class="text-sm">${book.price} €</p></div>
                             </div>
-                        `).join('') : '<div class="col-span-full py-20 text-center text-slate-400">Aucun livre trouvé.</div>'}
+                        `).join('')}
                     </div>
-                </div>
-            `;
+                </div>`;
         }
 
         function renderDetail(container) {
             const book = state.selectedBook;
             const isOwned = state.myPurchases.includes(book.id);
             container.innerHTML = `
-                <div class="animate-in fade-in duration-300">
-                    <button onclick="navigateTo('home')" class="mb-6 flex items-center gap-2 text-slate-500 hover:text-blue-600">
-                        <i data-lucide="chevron-left"></i> Retour
-                    </button>
-                    <div class="bg-white rounded-3xl p-6 md:p-10 shadow-xl border border-slate-100 flex flex-col md:flex-row gap-10">
-                        <div class="w-full md:w-1/3 flex-shrink-0">
-                            <img src="${book.coverImage}" class="w-full rounded-xl shadow-2xl shadow-blue-900/10">
-                        </div>
-                        <div class="flex-grow space-y-6">
-                            <div>
-                                <span class="text-sm font-bold text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase">${book.genre}</span>
-                                <h1 class="text-4xl font-black mt-4 text-slate-900">${book.title}</h1>
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <span class="text-3xl font-bold text-slate-800">${book.price} €</span>
-                                ${isOwned ? `<div class="text-green-600 font-bold flex gap-1"><i data-lucide="check-circle"></i> Déjà acheté</div>` : ''}
-                            </div>
-                            <p class="text-slate-600 italic border-l-4 border-slate-100 pl-4">Découvrez un chef-d'œuvre numérique.</p>
-                            <div class="pt-6">
-                                ${isOwned ? `
-                                    <button onclick="navigateTo('reader', ${JSON.stringify(book).replace(/"/g, '&quot;')})" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 flex justify-center gap-2">
-                                        <i data-lucide="book-open"></i> Lire maintenant
-                                    </button>
-                                ` : `
-                                    <button onclick="handlePurchase()" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-black flex justify-center gap-2">
-                                        <i data-lucide="shopping-bag"></i> Acheter l'E-Book
-                                    </button>
-                                `}
-                            </div>
-                        </div>
+                <button onclick="navigateTo('home')" class="mb-4 text-slate-500 flex items-center gap-1"><i data-lucide="chevron-left"></i> Retour</button>
+                <div class="bg-white p-6 rounded-3xl shadow-xl flex flex-col md:flex-row gap-8">
+                    <img src="${book.coverImage}" class="w-full md:w-1/3 rounded-xl shadow-lg">
+                    <div class="space-y-4">
+                        <h1 class="text-3xl font-bold">${book.title}</h1>
+                        <p class="text-2xl font-bold">${book.price} €</p>
+                        ${isOwned ? 
+                            `<button onclick="navigateTo('reader', ${JSON.stringify(book).replace(/"/g, '&quot;')})" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold italic">Lire maintenant</button>` : 
+                            `<button onclick="handlePurchase()" class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold">Acheter</button>`
+                        }
                     </div>
-                </div>
-            `;
+                </div>`;
         }
 
-        function renderLogin(container) {
+        function renderLibrary(container) {
+            const ownedBooks = state.books.filter(b => state.myPurchases.includes(b.id));
             container.innerHTML = `
-                <div class="max-w-md mx-auto py-10 space-y-8">
-                    <div class="text-center">
-                        <h2 class="text-2xl font-bold">Connexion</h2>
-                        <p class="text-slate-500 mt-2">Connectez-vous pour acheter des livres.</p>
+                <h1 class="text-2xl font-bold mb-6">Ma Bibliothèque</h1>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+                    ${ownedBooks.length > 0 ? ownedBooks.map(book => `
+                        <div class="bg-white rounded-2xl shadow-sm border p-2 cursor-pointer" onclick="navigateTo('reader', ${JSON.stringify(book).replace(/"/g, '&quot;')})">
+                            <img src="${book.coverImage}" class="w-full aspect-[3/4] object-cover rounded-xl">
+                            <p class="font-bold mt-2 text-center text-sm">${book.title}</p>
+                        </div>`).join('') : '<p class="col-span-full text-center py-10 text-slate-500">Aucun livre acheté.</p>'}
+                </div>`;
+        }
+
+        function renderAdmin(container) {
+            container.innerHTML = `
+                <div class="space-y-6">
+                    <h1 class="text-2xl font-bold">Admin</h1>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+                        <input id="admin-title" placeholder="Titre" class="w-full p-2 border rounded">
+                        <input id="admin-price" type="number" placeholder="Prix" class="w-full p-2 border rounded">
+                        <input id="admin-cover" placeholder="URL Image" class="w-full p-2 border rounded">
+                        <textarea id="admin-content" placeholder="Contenu" class="w-full p-2 border rounded h-32"></textarea>
+                        <button onclick="saveBook()" class="w-full bg-blue-600 text-white py-2 rounded-xl">Ajouter</button>
                     </div>
-                    <form id="login-form" class="space-y-4">
-                        <input name="email" type="email" placeholder="Email" required class="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500">
-                        <input name="password" type="password" placeholder="Mot de passe" required class="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500">
-                        ${state.authError ? `<p class="text-red-500 text-sm font-medium">${state.authError}</p>` : ''}
-                        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">Se connecter</button>
-                        <button type="button" onclick="navigateTo('signup')" class="w-full text-blue-600 font-medium py-2">Créer un compte</button>
-                    </form>
-                </div>
-            `;
-            document.getElementById('login-form').onsubmit = (e) => {
-                e.preventDefault();
-                login(e.target.email.value, e.target.password.value);
-            };
+                </div>`;
         }
 
         function renderReader(container) {
-            const book = state.selectedBook;
-            container.innerHTML = `
-                <div class="max-w-2xl mx-auto pb-20 animate-in fade-in">
-                    <div class="flex items-center justify-between mb-8 sticky top-20 bg-slate-50/90 py-4 z-10">
-                        <button onclick="navigateTo('library')" class="flex items-center gap-1 text-slate-500"><i data-lucide="chevron-left"></i> Bibliothèque</button>
-                        <h2 class="font-bold text-slate-400 text-sm uppercase tracking-widest">${book.title}</h2>
-                        <div class="w-10"></div>
-                    </div>
-                    <article class="prose bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-100 min-h-[70vh]">
-                        <h1 class="text-center mb-10 text-4xl">${book.title}</h1>
-                        <div class="whitespace-pre-wrap leading-relaxed text-slate-700 font-serif">
-                            ${book.contentText || "Aucun contenu disponible."}
-                        </div>
-                    </article>
-                </div>
-            `;
+            container.innerHTML = `<div class="prose bg-white p-8 rounded-3xl shadow-sm">
+                <button onclick="navigateTo('library')" class="mb-4 text-sm text-blue-600 underline">Retour</button>
+                <h1 class="text-2xl font-bold mb-4">${state.selectedBook.title}</h1>
+                <div class="whitespace-pre-wrap">${state.selectedBook.contentText}</div>
+            </div>`;
         }
 
-        // --- ACTIONS FIREBASE ---
+        function renderLogin(container) {
+            container.innerHTML = `<div class="max-w-md mx-auto py-10">
+                <form id="login-form" class="space-y-4 bg-white p-6 rounded-2xl shadow-sm border">
+                    <h2 class="text-xl font-bold">Connexion</h2>
+                    <input name="email" type="email" placeholder="Email" required class="w-full p-2 border rounded">
+                    <input name="password" type="password" placeholder="Pass" required class="w-full p-2 border rounded">
+                    <button class="w-full bg-blue-600 text-white py-2 rounded">Entrer</button>
+                </form>
+            </div>`;
+            document.getElementById('login-form').onsubmit = (e) => { e.preventDefault(); login(e.target.email.value, e.target.password.value); };
+        }
 
-        const login = async (email, password) => {
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                navigateTo(state.selectedBook ? 'detail' : 'home', state.selectedBook);
-            } catch (err) {
-                state.authError = "Identifiants invalides.";
-                render();
-            }
-        };
+        function renderSignup(container) { container.innerHTML = "<div class='p-10 text-center'><button onclick='navigateTo(\"login\")' class='underline'>Retour</button></div>"; }
 
-        const logout = async () => {
-            await signOut(auth);
-            state.isAdmin = false;
+        // --- ACTIONS ---
+        window.setGenre = (g) => { state.selectedGenre = g; render(); };
+        window.handleAdminAccess = () => { if(prompt("Code ?") === ADMIN_CODE) { state.isAdmin = true; navigateTo('admin'); } };
+        
+        window.saveBook = async () => {
+            const book = {
+                title: document.getElementById('admin-title').value,
+                price: parseFloat(document.getElementById('admin-price').value),
+                coverImage: document.getElementById('admin-cover').value,
+                contentText: document.getElementById('admin-content').value,
+                genre: "Roman", isPublished: true
+            };
+            await addDoc(collection(db, 'books'), book);
+            alert("Ajouté !");
             navigateTo('home');
         };
 
-        window.handleAdminAccess = () => {
-            const code = prompt("Code Admin :");
-            if (code === ADMIN_CODE) {
-                state.isAdmin = true;
-                navigateTo('admin');
-            }
-        };
+        const login = async (e, p) => { try { await signInWithEmailAndPassword(auth, e, p); navigateTo('home'); } catch { alert("Erreur"); } };
+        const logout = async () => { await signOut(auth); state.isAdmin = false; navigateTo('home'); };
 
         window.handlePurchase = async () => {
-            if (!state.user || state.user.isAnonymous) {
-                navigateTo('login', state.selectedBook);
-                return;
-            }
-            const ref = doc(db, 'artifacts', appId, 'users', state.user.uid, 'purchases', state.selectedBook.id);
-            await setDoc(ref, {
-                bookId: state.selectedBook.id,
-                purchaseDate: serverTimestamp(),
-                price: state.selectedBook.price
+            if (!state.user || state.user.isAnonymous) return navigateTo('login');
+            await setDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'purchases', state.selectedBook.id), {
+                bookId: state.selectedBook.id, date: serverTimestamp()
             });
             navigateTo('library');
         };
 
-// --- INITIALISATION ---
+        // --- INIT ---
         onAuthStateChanged(auth, (user) => {
             state.user = user;
-            
-            const loader = document.getElementById('loading-screen');
-            const main = document.getElementById('main-content');
-            if (loader) loader.classList.add('hidden');
-            if (main) main.classList.remove('hidden');
-
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
             if (user) {
                 onSnapshot(collection(db, 'books'), (snap) => {
                     state.books = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                     render();
-                }, (error) => {
-                    console.error("Erreur Firestore :", error);
                 });
-            } else {
-                signInAnonymously(auth);
-            }
+                onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'purchases'), (snap) => {
+                    state.myPurchases = snap.docs.map(d => d.id);
+                    render();
+                });
+            } else { signInAnonymously(auth); }
             render();
         });
     </script>
