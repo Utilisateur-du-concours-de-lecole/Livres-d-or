@@ -276,30 +276,39 @@
             render();
         };
 
-        // --- INITIALISATION ---
+// --- INITIALISATION ---
 
         onAuthStateChanged(auth, (user) => {
             state.user = user;
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('main-content').classList.remove('hidden');
+            
+            // On force l'affichage du site dès que Firebase répond
+            const loader = document.getElementById('loading-screen');
+            const main = document.getElementById('main-content');
+            if (loader) loader.classList.add('hidden');
+            if (main) main.classList.remove('hidden');
 
             if (user) {
-                // Ecouter les achats
+                // 1. Ecouter les achats
                 if (!user.isAnonymous) {
                     onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'purchases'), (snap) => {
                         state.myPurchases = snap.docs.map(d => d.data().bookId);
                         render();
                     });
                 }
-// Remplace la partie "Ecouter les livres" par ceci :
-const qBooks = collection(db, 'books');
-onSnapshot(qBooks, (snap) => {
-    state.books = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    render();
-}, (error) => {
-    console.error("Erreur Firestore :", error);
-});
-
+                
+                // 2. Ecouter les livres (Chemin simplifié)
+                const qBooks = collection(db, 'books');
+                onSnapshot(qBooks, (snap) => {
+                    state.books = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    render();
+                }, (error) => {
+                    console.error("Erreur Firestore :", error);
+                });
+            } else {
+                signInAnonymously(auth);
+            }
+            render();
+        });
     </script>
 </body>
 </html>
